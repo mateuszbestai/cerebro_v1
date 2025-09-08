@@ -30,6 +30,16 @@ const Message: React.FC<MessageProps> = ({ message }) => {
     navigator.clipboard.writeText(message.content);
   };
 
+  const handleThumbsUp = () => {
+    // Feedback functionality placeholder
+    console.log('Thumbs up for message:', message.id);
+  };
+
+  const handleThumbsDown = () => {
+    // Feedback functionality placeholder
+    console.log('Thumbs down for message:', message.id);
+  };
+
   return (
     <ListItem
       sx={{
@@ -115,12 +125,12 @@ const Message: React.FC<MessageProps> = ({ message }) => {
                 </IconButton>
               </Tooltip>
               <Tooltip title="Good response">
-                <IconButton size="small">
+                <IconButton size="small" onClick={handleThumbsUp}>
                   <ThumbUpIcon fontSize="small" />
                 </IconButton>
               </Tooltip>
               <Tooltip title="Bad response">
-                <IconButton size="small">
+                <IconButton size="small" onClick={handleThumbsDown}>
                   <ThumbDownIcon fontSize="small" />
                 </IconButton>
               </Tooltip>

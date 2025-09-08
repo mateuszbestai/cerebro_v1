@@ -22,8 +22,9 @@ export class ChartService {
     return rawData as ChartData;
   }
 
-  static exportChart(chartData: ChartData, format: 'png' | 'svg' | 'pdf' = 'png'): void {
+  static exportChart(_chartData: ChartData, format: 'png' | 'svg' | 'pdf' = 'png'): void {
     // Implementation would use Plotly's export functionality
+    // Using underscore prefix to indicate intentionally unused parameter
     console.log(`Exporting chart as ${format}`);
   }
 

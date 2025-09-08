@@ -15,6 +15,7 @@ services:
       - AZURE_OPENAI_ENDPOINT=${AZURE_OPENAI_ENDPOINT}
       - AZURE_OPENAI_DEPLOYMENT_NAME=${AZURE_OPENAI_DEPLOYMENT_NAME}
       - REDIS_URL=redis://redis:6379
+      - ODBC_DRIVER=FreeTDS  # Explicitly set the driver
     depends_on:
       - redis
     volumes:
@@ -29,18 +30,13 @@ services:
       dockerfile: Dockerfile
     container_name: ai-analysis-frontend
     environment:
-      # Use service names, not localhost
       - REACT_APP_API_URL=http://backend:8000/api/v1
       - REACT_APP_WS_URL=ws://backend:8000/ws
     depends_on:
       - backend
-    volumes:
-      - ./frontend:/app
-      - /app/node_modules
     networks:
       - ai-analysis-network
     restart: unless-stopped
-    # Notice: no ports here (nginx will expose ports)
 
   redis:
     image: redis:7-alpine

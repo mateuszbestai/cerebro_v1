@@ -91,6 +91,11 @@ const DataTable: React.FC<DataTableProps> = ({ data }) => {
     a.click();
   };
 
+  const handleFilter = () => {
+    // Filter functionality placeholder
+    console.log('Filter clicked');
+  };
+
   return (
     <Box>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
@@ -103,7 +108,7 @@ const DataTable: React.FC<DataTableProps> = ({ data }) => {
         />
         <Box>
           <Tooltip title="Filter">
-            <IconButton>
+            <IconButton onClick={handleFilter}>
               <FilterIcon />
             </IconButton>
           </Tooltip>

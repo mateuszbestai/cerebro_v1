@@ -12,7 +12,7 @@ class ChatHistory(Base):
     session_id = Column(String(100), index=True)
     user_message = Column(Text)
     ai_response = Column(Text)
-    metadata = Column(JSON)
+    data = Column(JSON)
     created_at = Column(DateTime, default=datetime.utcnow)
 
 class AnalysisResults(Base):

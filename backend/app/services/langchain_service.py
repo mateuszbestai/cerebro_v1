@@ -3,7 +3,7 @@ from langchain.agents import Tool, AgentExecutor, create_react_agent
 from langchain.memory import ConversationBufferWindowMemory
 from langchain.prompts import PromptTemplate
 from langchain.chains import LLMChain
-from langchain.callbacks import CallbackManager
+from langchain.callbacks.manager import CallbackManager
 from langchain.callbacks.streaming_stdout import StreamingStdOutCallbackHandler
 import logging
 

@@ -8,7 +8,33 @@ COPY . .
 ENV NODE_OPTIONS=--max-old-space-size=4096
 RUN npm run build
 
-# Production image just keeps build output
-FROM alpine:3.19 AS prod
-WORKDIR /app
-COPY --from=build /app/dist ./dist
+# Production stage - serve the built files with a static server
+FROM nginx:alpine AS prod
+WORKDIR /usr/share/nginx/html
+
+# Remove default nginx static files
+RUN rm -rf ./*
+
+# Copy built files from build stage
+COPY --from=build /app/dist .
+
+# Add custom nginx config for SPA routing
+RUN echo 'server { \
+    listen 3000; \
+    server_name localhost; \
+    root /usr/share/nginx/html; \
+    index index.html; \
+    location / { \
+        try_files $uri $uri/ /index.html; \
+    } \
+    location /api { \
+        return 404; \
+    } \
+}' > /etc/nginx/conf.d/default.conf
+
+# Remove the default server block
+RUN sed -i '/listen       80;/,/^}/d' /etc/nginx/nginx.conf
+
+EXPOSE 3000
+
+CMD ["nginx", "-g", "daemon off;"]

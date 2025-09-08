@@ -1,9 +1,9 @@
 from typing import Dict, Any, Optional, List
-from langchain.agents import create_sql_agent
-from langchain.agents.agent_toolkits import SQLDatabaseToolkit
-from langchain.sql_database import SQLDatabase
+from langchain_community.agent_toolkits.sql.base import create_sql_agent
+from langchain_community.agent_toolkits import SQLDatabaseToolkit
+from langchain_community.utilities import SQLDatabase
 from langchain.agents.agent_types import AgentType
-from langchain.callbacks import CallbackManagerForToolRun
+from langchain.callbacks.manager import CallbackManager
 import logging
 import pandas as pd
 
