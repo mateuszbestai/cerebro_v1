@@ -11,7 +11,6 @@ import {
   CardContent,
   IconButton,
   Tooltip,
-  Button,
 } from '@mui/material';
 import {
   Download as DownloadIcon,
@@ -25,10 +24,10 @@ import { useAnalysis } from '../../hooks/useAnalysis';
 import LoadingSpinner from '../Common/LoadingSpinner';
 
 const AnalysisResults: React.FC = () => {
-  const { results, currentResult, isAnalyzing, runAnalysis } = useAnalysis();
+  const { currentResult, isAnalyzing, runAnalysis } = useAnalysis();
   const [activeTab, setActiveTab] = useState(0);
 
-  const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
+  const handleTabChange = (_event: React.SyntheticEvent, newValue: number) => {
     setActiveTab(newValue);
   };
 

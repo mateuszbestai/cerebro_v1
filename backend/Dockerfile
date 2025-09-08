@@ -1,28 +1,24 @@
-FROM python:3.11-slim
+FROM python:3.11-slim-bookworm
 
 WORKDIR /app
 
-# Install system dependencies for Azure SQL
+# Install system dependencies and FreeTDS (more reliable cross-platform solution)
 RUN apt-get update && apt-get install -y \
     gcc \
     g++ \
+    unixodbc \
     unixodbc-dev \
+    freetds-dev \
+    freetds-bin \
+    tdsodbc \
     curl \
-    gnupg \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Microsoft ODBC Driver for SQL Server (Debian 12+)
-RUN curl -sSL https://packages.microsoft.com/keys/microsoft.asc \
-    | gpg --dearmor \
-    | tee /usr/share/keyrings/microsoft-prod.gpg > /dev/null \
-    && curl -sSL https://packages.microsoft.com/config/debian/12/prod.list \
-    | sed 's#arch=amd64,arm64,armhf#arch=amd64,arm64,armhf signed-by=/usr/share/keyrings/microsoft-prod.gpg#' \
-    | tee /etc/apt/sources.list.d/mssql-release.list \
-    && apt-get update \
-    && ACCEPT_EULA=Y apt-get install -y msodbcsql17 \
-    && rm -rf /var/lib/apt/lists/*
-
-
+# Configure FreeTDS driver for ODBC
+RUN echo "[FreeTDS]\n\
+Description = FreeTDS Driver\n\
+Driver = /usr/lib/$(uname -m)-linux-gnu/odbc/libtdsodbc.so\n\
+Setup = /usr/lib/$(uname -m)-linux-gnu/odbc/libtdsS.so" >> /etc/odbcinst.ini
 
 # Copy requirements and install Python dependencies
 COPY requirements.txt .
@@ -34,6 +30,9 @@ COPY . .
 # Create non-root user
 RUN useradd -m -u 1000 appuser && chown -R appuser:appuser /app
 USER appuser
+
+# Set environment variable to use FreeTDS by default
+ENV ODBC_DRIVER="FreeTDS"
 
 # Expose port
 EXPOSE 8000

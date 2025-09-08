@@ -6,8 +6,6 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     container_name: ai-analysis-backend
-    ports:
-      - "8000:8000"
     environment:
       - AZURE_SQL_SERVER=${AZURE_SQL_SERVER}
       - AZURE_SQL_DATABASE=${AZURE_SQL_DATABASE}
@@ -30,11 +28,10 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
     container_name: ai-analysis-frontend
-    ports:
-      - "3000:3000"
     environment:
-      - REACT_APP_API_URL=http://localhost:8000/api/v1
-      - REACT_APP_WS_URL=ws://localhost:8000/ws
+      # Use service names, not localhost
+      - REACT_APP_API_URL=http://backend:8000/api/v1
+      - REACT_APP_WS_URL=ws://backend:8000/ws
     depends_on:
       - backend
     volumes:
@@ -43,12 +40,11 @@ services:
     networks:
       - ai-analysis-network
     restart: unless-stopped
+    # Notice: no ports here (nginx will expose ports)
 
   redis:
     image: redis:7-alpine
     container_name: ai-analysis-redis
-    ports:
-      - "6379:6379"
     volumes:
       - redis_data:/data
     networks:
@@ -62,7 +58,7 @@ services:
       - "80:80"
       - "443:443"
     volumes:
-      - ./nginx/nginx.conf:/etc/nginx/nginx.conf
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
       - ./nginx/ssl:/etc/nginx/ssl
     depends_on:
       - backend

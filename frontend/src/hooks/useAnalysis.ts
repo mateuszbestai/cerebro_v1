@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useCallback } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { RootState } from '../store';
 import { 
@@ -30,7 +30,7 @@ export const useAnalysis = () => {
         const maxAttempts = 30;
         const pollInterval = 2000;
 
-        const pollForResults = async () => {
+        const pollForResults = async (): Promise<void> => {
           if (attempts >= maxAttempts) {
             throw new Error('Analysis timeout');
           }
@@ -47,7 +47,8 @@ export const useAnalysis = () => {
           }
 
           attempts++;
-          setTimeout(pollForResults, pollInterval);
+          await new Promise(resolve => setTimeout(resolve, pollInterval));
+          return pollForResults();
         };
 
         await pollForResults();

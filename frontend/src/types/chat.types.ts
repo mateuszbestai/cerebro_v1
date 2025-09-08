@@ -1,3 +1,5 @@
+import type { AnalysisResult } from './analysis.types';
+
 export interface Message {
     id: string;
     content: string;

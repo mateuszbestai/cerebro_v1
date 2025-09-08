@@ -32,13 +32,6 @@ const MessageInput: React.FC<MessageInputProps> = ({ onSendMessage, disabled }) 
     }
   };
 
-  const queryTemplates = [
-    "Show me the top 10 customers by revenue",
-    "What's the trend in sales over the last quarter?",
-    "Generate a report on product performance",
-    "Analyze customer segmentation data",
-  ];
-
   return (
     <Box sx={{ p: 2 }}>
       <TextField
@@ -59,6 +52,7 @@ const MessageInput: React.FC<MessageInputProps> = ({ onSendMessage, disabled }) 
                   size="small"
                   onClick={() => {
                     // Show query templates dropdown
+                    console.log('Show templates');
                   }}
                 >
                   <QueryStatsIcon />

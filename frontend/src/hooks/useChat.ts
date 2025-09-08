@@ -1,9 +1,9 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useCallback, useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { RootState } from '../store';
 import { addMessage, setLoading, setAnalysis } from '../store/chatSlice';
 import { apiClient } from '../services/api';
-import { Message, AnalysisResult } from '../types';
+import { Message } from '../types';
 import { useWebSocket } from './useWebSocket';
 
 export const useChat = () => {
@@ -12,8 +12,8 @@ export const useChat = () => {
     (state: RootState) => state.chat
   );
 
-  const { sendMessage: wsSend, lastMessage } = useWebSocket(
-    process.env.REACT_APP_WS_URL || 'ws://localhost:8000/ws'
+  const { lastMessage } = useWebSocket(
+    import.meta.env.VITE_WS_URL || 'ws://localhost:8000/ws'
   );
 
   const sendMessage = useCallback(
@@ -30,10 +30,7 @@ export const useChat = () => {
 
       try {
         // Send to backend
-        const response = await apiClient.post('/chat/message', {
-          message: content,
-          context: currentAnalysis,
-        });
+        const response = await apiClient.sendChatMessage(content, currentAnalysis);
 
         // Add AI response
         const aiMessage: Message = {
@@ -69,12 +66,16 @@ export const useChat = () => {
   // Handle WebSocket messages for real-time updates
   useEffect(() => {
     if (lastMessage) {
-      const data = JSON.parse(lastMessage);
-      
-      if (data.type === 'analysis_update') {
-        dispatch(setAnalysis(data.analysis));
-      } else if (data.type === 'message') {
-        dispatch(addMessage(data.message));
+      try {
+        const data = JSON.parse(lastMessage);
+        
+        if (data.type === 'analysis_update') {
+          dispatch(setAnalysis(data.analysis));
+        } else if (data.type === 'message') {
+          dispatch(addMessage(data.message));
+        }
+      } catch (error) {
+        console.error('Error parsing WebSocket message:', error);
       }
     }
   }, [lastMessage, dispatch]);

@@ -21,12 +21,11 @@ import {
 
 interface DataTableProps {
   data: any[];
-  title?: string;
 }
 
 type Order = 'asc' | 'desc';
 
-const DataTable: React.FC<DataTableProps> = ({ data, title }) => {
+const DataTable: React.FC<DataTableProps> = ({ data }) => {
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [searchTerm, setSearchTerm] = useState('');
@@ -39,7 +38,7 @@ const DataTable: React.FC<DataTableProps> = ({ data, title }) => {
 
   const columns = Object.keys(data[0]);
 
-  const handleChangePage = (event: unknown, newPage: number) => {
+  const handleChangePage = (_event: unknown, newPage: number) => {
     setPage(newPage);
   };
 

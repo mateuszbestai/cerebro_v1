@@ -6,7 +6,6 @@ import {
   IconButton,
   Box,
   Badge,
-  Avatar,
   Menu,
   MenuItem,
   Tooltip,

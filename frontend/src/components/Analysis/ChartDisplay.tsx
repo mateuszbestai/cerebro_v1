@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useRef } from 'react';
 import { Box, Paper, Typography, IconButton, Tooltip } from '@mui/material';
 import DownloadIcon from '@mui/icons-material/Download';
 import FullscreenIcon from '@mui/icons-material/Fullscreen';
@@ -17,17 +17,26 @@ const ChartDisplay: React.FC<ChartDisplayProps> = ({ chartData }) => {
   const chartRef = useRef<any>(null);
   
   // Parse the JSON data from backend
-  const parsedData = JSON.parse(chartData.data);
+  let parsedData;
+  try {
+    parsedData = JSON.parse(chartData.data);
+  } catch (error) {
+    console.error('Error parsing chart data:', error);
+    return (
+      <Paper elevation={2} sx={{ p: 2 }}>
+        <Typography color="error">Error loading chart data</Typography>
+      </Paper>
+    );
+  }
 
   const handleDownload = () => {
     // Download chart as image
-    if (chartRef.current) {
-      // Plotly download functionality
-    }
+    console.log('Download chart');
   };
 
   const handleFullscreen = () => {
     // Open chart in fullscreen modal
+    console.log('Fullscreen view');
   };
 
   return (
@@ -56,7 +65,7 @@ const ChartDisplay: React.FC<ChartDisplayProps> = ({ chartData }) => {
       <Box sx={{ width: '100%', height: 400 }}>
         <Plot
           ref={chartRef}
-          data={parsedData.data}
+          data={parsedData.data || []}
           layout={{
             ...parsedData.layout,
             autosize: true,
