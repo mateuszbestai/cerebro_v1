@@ -7,22 +7,30 @@ from langchain.callbacks.manager import CallbackManager
 import logging
 import pandas as pd
 
-from app.database.connection import DatabaseManager
 from app.config import settings
 
 logger = logging.getLogger(__name__)
 
 class SQLAgent:
-    """Agent for SQL database analysis"""
+    """Agent for SQL database analysis with lazy initialization"""
     
     def __init__(self, llm):
         self.llm = llm
         self.db = None
         self.agent = None
-        self._initialize()
+        self._initialized = False
+        self._initialization_error = None
     
     def _initialize(self):
-        """Initialize SQL database connection and agent"""
+        """Lazy initialization of SQL database connection and agent"""
+        if self._initialized:
+            return True
+            
+        if self._initialization_error:
+            # Don't retry if we already failed
+            logger.warning(f"SQL Agent initialization previously failed: {self._initialization_error}")
+            return False
+            
         try:
             # Create SQLDatabase instance for LangChain
             self.db = SQLDatabase.from_uri(
@@ -47,14 +55,29 @@ class SQLAgent:
                 max_iterations=5
             )
             
+            self._initialized = True
+            logger.info("SQL Agent initialized successfully")
+            return True
+            
         except Exception as e:
+            self._initialization_error = str(e)
             logger.error(f"Failed to initialize SQL Agent: {str(e)}")
-            raise
+            logger.info("SQL Agent will not be available for this session")
+            return False
     
     async def execute_query(self, natural_language_query: str) -> Dict[str, Any]:
         """
         Execute a natural language query against the database
         """
+        # Try to initialize if not already done
+        if not self._initialized and not self._initialize():
+            return {
+                "error": f"SQL Agent is not available: {self._initialization_error}",
+                "data": None,
+                "query": None,
+                "explanation": "The SQL database connection could not be established. Please check your database configuration."
+            }
+        
         try:
             # Add context to help the agent
             enhanced_query = f"""
@@ -171,6 +194,14 @@ class SQLAgent:
     
     async def get_table_info(self) -> Dict[str, Any]:
         """Get information about available tables"""
+        # Try to initialize if not already done
+        if not self._initialized and not self._initialize():
+            return {
+                "error": "SQL Agent is not available",
+                "tables": [],
+                "schema": None
+            }
+            
         try:
             table_info = self.db.get_table_info()
             return {
@@ -179,4 +210,8 @@ class SQLAgent:
             }
         except Exception as e:
             logger.error(f"Error getting table info: {str(e)}")
-            raise
+            return {
+                "error": str(e),
+                "tables": [],
+                "schema": None
+            }

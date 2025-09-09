@@ -5,7 +5,6 @@ import json
 import asyncio
 import logging
 
-from app.agents.orchestrator import AgentOrchestrator
 from app.utils.logger import setup_logger
 
 router = APIRouter()
@@ -41,20 +40,60 @@ class ConnectionManager:
             await connection.send_text(message)
 
 manager = ConnectionManager()
-orchestrator = AgentOrchestrator()
+
+# Lazy initialization of orchestrator
+_orchestrator = None
+
+def get_orchestrator():
+    """Get or create the orchestrator instance"""
+    global _orchestrator
+    if _orchestrator is None:
+        try:
+            from app.agents.orchestrator import AgentOrchestrator
+            _orchestrator = AgentOrchestrator()
+            logger.info("Orchestrator initialized successfully")
+        except Exception as e:
+            logger.error(f"Failed to initialize orchestrator: {str(e)}")
+            # Return a dummy orchestrator that provides basic functionality
+            _orchestrator = DummyOrchestrator()
+    return _orchestrator
+
+class DummyOrchestrator:
+    """Fallback orchestrator when main orchestrator fails to initialize"""
+    
+    async def process_query(
+        self, 
+        query: str, 
+        context: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
+        """Process query with limited functionality"""
+        logger.warning("Using dummy orchestrator - limited functionality available")
+        return {
+            "query": query,
+            "intent": {"type": "general"},
+            "response": "I'm currently running with limited functionality. Database and advanced analysis features may not be available. However, I can still help with general questions!",
+            "data": None,
+            "visualization": None,
+            "report": None,
+            "error": "Limited functionality mode"
+        }
 
 @router.post("/message", response_model=ChatResponse)
 async def send_message(chat_message: ChatMessage):
     '''Process a chat message and return response with analysis'''
     try:
+        # Get the orchestrator (will initialize on first use)
+        orchestrator = get_orchestrator()
+        
         # Process the message through the orchestrator
         result = await orchestrator.process_query(
             chat_message.message,
             chat_message.context
         )
         
-        return ChatResponse(
-            response=result["response"],
+        # Build response
+        response = ChatResponse(
+            response=result.get("response", "No response generated"),
             analysis={
                 "data": result.get("data"),
                 "visualization": result.get("visualization"),
@@ -63,9 +102,30 @@ async def send_message(chat_message: ChatMessage):
             }
         )
         
+        # Add error if present
+        if result.get("error"):
+            response.error = result["error"]
+        
+        return response
+        
     except Exception as e:
         logger.error(f"Error processing message: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        return ChatResponse(
+            response="I encountered an error processing your message. Please try again.",
+            error=str(e)
+        )
+
+@router.get("/health")
+async def health_check():
+    '''Check if chat service is healthy'''
+    orchestrator = get_orchestrator()
+    is_dummy = isinstance(orchestrator, DummyOrchestrator)
+    
+    return {
+        "status": "degraded" if is_dummy else "healthy",
+        "service": "chat",
+        "limited_mode": is_dummy
+    }
 
 @router.get("/history")
 async def get_chat_history(limit: int = 50):
@@ -79,6 +139,8 @@ async def websocket_endpoint(websocket: WebSocket):
     await manager.connect(websocket)
     
     try:
+        orchestrator = get_orchestrator()
+        
         while True:
             # Receive message from client
             data = await websocket.receive_text()
