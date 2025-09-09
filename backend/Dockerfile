@@ -14,17 +14,16 @@ RUN apt-get update && apt-get install -y \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Configure FreeTDS and ODBC
-RUN echo "[FreeTDS]\n\
-Description = FreeTDS Driver\n\
-Driver = /usr/lib/x86_64-linux-gnu/odbc/libtdsodbc.so\n\
-Setup = /usr/lib/x86_64-linux-gnu/odbc/libtdsS.so\n\
-FileUsage = 1" > /etc/odbcinst.ini
-
-# Also add ODBC Driver 17 alias for compatibility
-RUN echo "[ODBC Driver 17 for SQL Server]\n\
-Description = FreeTDS Driver (Alias)\n\
-Driver = /usr/lib/x86_64-linux-gnu/odbc/libtdsodbc.so" >> /etc/odbcinst.ini
+# Configure FreeTDS and ODBC (handle both amd64 and arm64 library paths)
+RUN ARCH_DIR=$(dpkg-architecture -q DEB_HOST_GNU_CPU 2>/dev/null || uname -m) \
+    && if [ "$ARCH_DIR" = "x86_64" ] || [ "$ARCH_DIR" = "amd64" ]; then \
+         ODBC_LIB_DIR="/usr/lib/x86_64-linux-gnu/odbc"; \
+       else \
+         ODBC_LIB_DIR="/usr/lib/aarch64-linux-gnu/odbc"; \
+       fi \
+    && echo "[FreeTDS]\nDescription = FreeTDS Driver\nDriver = ${ODBC_LIB_DIR}/libtdsodbc.so\nFileUsage = 1" > /etc/odbcinst.ini \
+    && echo "[ODBC Driver 17 for SQL Server]\nDescription = FreeTDS Driver (Alias)\nDriver = ${ODBC_LIB_DIR}/libtdsodbc.so" >> /etc/odbcinst.ini \
+    && echo "[ODBC Driver 18 for SQL Server]\nDescription = FreeTDS Driver (Alias)\nDriver = ${ODBC_LIB_DIR}/libtdsodbc.so" >> /etc/odbcinst.ini
 
 # Configure FreeTDS
 RUN echo "[global]\n\
