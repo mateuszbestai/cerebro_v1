@@ -1,25 +1,36 @@
-import React from 'react';
-import { Provider } from 'react-redux';
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
+import { Provider } from 'react-redux';
 import { store } from './store';
+
+// Components
 import Layout from './components/Common/Layout';
 import ChatInterface from './components/Chat/ChatInterface';
 import AnalysisResults from './components/Analysis/AnalysisResults';
 import ReportViewer from './components/Reports/ReportViewer';
+import ConnectionDialog from './components/Database/ConnectionDialog';
+import TablesDashboard from './components/Database/TablesDashboard';
+import DatabaseStatus from './components/Database/DatabaseStatus.tsx';
+
+// Contexts
+import { DatabaseProvider } from './contexts/DatabaseContext';
+import { ChatProvider } from './contexts/ChatContext';
+
+// Hooks
+import { useDatabase } from './hooks/useDatabase';
 
 const theme = createTheme({
   palette: {
-    mode: 'light',
     primary: {
-      main: '#0078D4', // Azure blue
+      main: '#0078D4',
     },
     secondary: {
       main: '#40E0D0',
     },
     background: {
-      default: '#F5F5F5',
+      default: '#f5f5f5',
     },
   },
   typography: {
@@ -27,23 +38,72 @@ const theme = createTheme({
   },
 });
 
-const App: React.FC = () => {
+function AppContent() {
+  const { isConnected, connectionId } = useDatabase();
+  const [connectionDialogOpen, setConnectionDialogOpen] = useState(false);
+  const [showWelcome, setShowWelcome] = useState(true);
+
+  useEffect(() => {
+    // Show connection dialog on first load if not connected
+    if (!isConnected && showWelcome) {
+      const timer = setTimeout(() => {
+        setConnectionDialogOpen(true);
+        setShowWelcome(false);
+      }, 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [isConnected, showWelcome]);
+
+  const handleConnectionSuccess = (connectionId: string) => {
+    setConnectionDialogOpen(false);
+    // Optionally navigate to tables dashboard
+    // navigate('/database');
+  };
+
+  return (
+    <>
+      {/* Database Status Bar */}
+      <DatabaseStatus onConnect={() => setConnectionDialogOpen(true)} />
+      
+      {/* Connection Dialog */}
+      <ConnectionDialog
+        open={connectionDialogOpen}
+        onClose={() => setConnectionDialogOpen(false)}
+        onConnect={handleConnectionSuccess}
+      />
+
+      {/* Main Routes */}
+      <Routes>
+        <Route path="/" element={<ChatInterface />} />
+        <Route path="/database" element={<TablesDashboard />} />
+        <Route path="/analysis" element={<AnalysisResults />} />
+        <Route path="/reports" element={<ReportViewer />} />
+        <Route path="/visualizations" element={<div>Visualizations Page</div>} />
+        <Route path="/settings" element={<div>Settings Page</div>} />
+        <Route path="/help" element={<div>Help Page</div>} />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </>
+  );
+}
+
+function App() {
   return (
     <Provider store={store}>
       <ThemeProvider theme={theme}>
         <CssBaseline />
-        <Router>
-          <Layout>
-            <Routes>
-              <Route path="/" element={<ChatInterface />} />
-              <Route path="/analysis" element={<AnalysisResults />} />
-              <Route path="/reports" element={<ReportViewer />} />
-            </Routes>
-          </Layout>
-        </Router>
+        <DatabaseProvider>
+          <ChatProvider>
+            <Router>
+              <Layout>
+                <AppContent />
+              </Layout>
+            </Router>
+          </ChatProvider>
+        </DatabaseProvider>
       </ThemeProvider>
     </Provider>
   );
-};
+}
 
 export default App;

@@ -1,20 +1,75 @@
-import axios, { AxiosInstance } from 'axios';
+import axios, { AxiosInstance, CancelToken } from 'axios';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000/api/v1';
+const WS_BASE_URL = process.env.REACT_APP_WS_URL || 'ws://localhost:8000/ws';
+
+interface ChatMessage {
+  message: string;
+  context?: any;
+}
+
+interface ChatResponse {
+  response: string;
+  analysis?: {
+    data?: any[];
+    visualization?: any;
+    report?: any;
+    intent?: any;
+    sql_query?: string;
+    columns?: string[];
+    row_count?: number;
+    error?: string;
+  };
+  error?: string;
+}
+
+interface AnalysisRequest {
+  query: string;
+  data?: any;
+  analysis_type?: string;
+  visualization_required?: boolean;
+}
+
+interface AnalysisResponse {
+  analysis_id: string;
+  status: string;
+  result?: any;
+  error?: string;
+}
+
+interface ReportRequest {
+  title: string;
+  description?: string;
+  data?: any;
+  analysis_results?: any;
+  format?: string;
+  include_charts?: boolean;
+}
+
+interface ReportResponse {
+  report_id: string;
+  title: string;
+  status: string;
+  created_at: string;
+  url?: string;
+  error?: string;
+}
 
 class ApiClient {
-  private client: AxiosInstance;
+  private axiosInstance: AxiosInstance;
+  private wsConnection: WebSocket | null = null;
 
   constructor() {
-    this.client = axios.create({
+    this.axiosInstance = axios.create({
       baseURL: API_BASE_URL,
       headers: {
         'Content-Type': 'application/json',
       },
+      timeout: 30000, // 30 seconds
     });
 
     // Request interceptor
-    this.client.interceptors.request.use(
+    this.axiosInstance.interceptors.request.use(
       (config) => {
         // Add auth token if available
         const token = localStorage.getItem('auth_token');
@@ -23,13 +78,15 @@ class ApiClient {
         }
         return config;
       },
-      (error) => Promise.reject(error)
+      (error) => {
+        return Promise.reject(error);
+      }
     );
 
     // Response interceptor
-    this.client.interceptors.response.use(
+    this.axiosInstance.interceptors.response.use(
       (response) => response,
-      async (error) => {
+      (error) => {
         if (error.response?.status === 401) {
           // Handle unauthorized
           localStorage.removeItem('auth_token');
@@ -41,44 +98,181 @@ class ApiClient {
   }
 
   // Chat endpoints
-  async sendChatMessage(message: string, context?: any) {
-    return this.client.post('/chat/message', { message, context });
+  async sendChatMessage(
+    message: string, 
+    context?: any,
+    cancelToken?: CancelToken
+  ): Promise<ChatResponse> {
+    const response = await this.axiosInstance.post<ChatResponse>(
+      '/chat/message',
+      { message, context },
+      { cancelToken }
+    );
+    return response.data;
   }
 
-  async getChatHistory() {
-    return this.client.get('/chat/history');
+  async getChatHistory(limit: number = 50): Promise<{ messages: any[]; total: number }> {
+    const response = await this.axiosInstance.get('/chat/history', {
+      params: { limit },
+    });
+    return response.data;
+  }
+
+  // WebSocket connection for real-time chat
+  connectWebSocket(
+    onMessage: (data: any) => void,
+    onError?: (error: any) => void,
+    onClose?: () => void
+  ): WebSocket {
+    if (this.wsConnection) {
+      this.wsConnection.close();
+    }
+
+    this.wsConnection = new WebSocket(`${WS_BASE_URL}/chat/ws`);
+
+    this.wsConnection.onopen = () => {
+      console.log('WebSocket connected');
+    };
+
+    this.wsConnection.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        onMessage(data);
+      } catch (error) {
+        console.error('Error parsing WebSocket message:', error);
+      }
+    };
+
+    this.wsConnection.onerror = (error) => {
+      console.error('WebSocket error:', error);
+      if (onError) onError(error);
+    };
+
+    this.wsConnection.onclose = () => {
+      console.log('WebSocket disconnected');
+      if (onClose) onClose();
+    };
+
+    return this.wsConnection;
+  }
+
+  sendWebSocketMessage(message: any): void {
+    if (this.wsConnection && this.wsConnection.readyState === WebSocket.OPEN) {
+      this.wsConnection.send(JSON.stringify(message));
+    }
+  }
+
+  closeWebSocket(): void {
+    if (this.wsConnection) {
+      this.wsConnection.close();
+      this.wsConnection = null;
+    }
   }
 
   // Analysis endpoints
-  async runAnalysis(query: string, data?: any) {
-    return this.client.post('/analysis/run', { query, data });
+  async runAnalysis(request: AnalysisRequest): Promise<AnalysisResponse> {
+    const response = await this.axiosInstance.post<AnalysisResponse>(
+      '/analysis/run',
+      request
+    );
+    return response.data;
   }
 
-  async getAnalysisResults(analysisId: string) {
-    return this.client.get(`/analysis/results/${analysisId}`);
+  async getAnalysisResults(analysisId: string): Promise<AnalysisResponse> {
+    const response = await this.axiosInstance.get<AnalysisResponse>(
+      `/analysis/results/${analysisId}`
+    );
+    return response.data;
+  }
+
+  async getDatabaseSchema(): Promise<any> {
+    const response = await this.axiosInstance.get('/analysis/schema');
+    return response.data;
+  }
+
+  async getTables(): Promise<{ tables: string[] }> {
+    const response = await this.axiosInstance.get('/analysis/tables');
+    return response.data;
   }
 
   // Report endpoints
-  async generateReport(params: any) {
-    return this.client.post('/reports/generate', params);
+  async generateReport(request: ReportRequest): Promise<ReportResponse> {
+    const response = await this.axiosInstance.post<ReportResponse>(
+      '/reports/generate',
+      request
+    );
+    return response.data;
   }
 
-  async getReports() {
-    return this.client.get('/reports');
+  async getReports(limit: number = 10): Promise<{ data: ReportResponse[] }> {
+    const response = await this.axiosInstance.get('/reports', {
+      params: { limit },
+    });
+    return response;
   }
 
-  async getReport(reportId: string) {
-    return this.client.get(`/reports/${reportId}`);
+  async getReport(reportId: string): Promise<{ data: ReportResponse }> {
+    const response = await this.axiosInstance.get(`/reports/${reportId}`);
+    return response;
   }
 
-  // Database info
-  async getDatabaseSchema() {
-    return this.client.get('/analysis/schema');
+  async downloadReport(reportId: string): Promise<Blob> {
+    const response = await this.axiosInstance.get(`/reports/download/${reportId}`, {
+      responseType: 'blob',
+    });
+    return response.data;
   }
 
-  async getTables() {
-    return this.client.get('/analysis/tables');
+  // Health check
+  async checkHealth(): Promise<{
+    status: string;
+    services: {
+      api: string;
+      database_connections: number;
+      openai_configured: boolean;
+    };
+  }> {
+    const response = await this.axiosInstance.get('/health');
+    return response.data;
+  }
+
+  // API status
+  async getApiStatus(): Promise<{
+    database: {
+      active_connections: number;
+      available_drivers: string[];
+    };
+    configuration: {
+      sql_config_present: boolean;
+      openai_config_present: boolean;
+      cors_origins: string[];
+    };
+    version: string;
+  }> {
+    const response = await this.axiosInstance.get('/status');
+    return response.data;
+  }
+
+  // Utility methods
+  setAuthToken(token: string): void {
+    localStorage.setItem('auth_token', token);
+  }
+
+  clearAuthToken(): void {
+    localStorage.removeItem('auth_token');
+  }
+
+  isAuthenticated(): boolean {
+    return !!localStorage.getItem('auth_token');
   }
 }
 
 export const apiClient = new ApiClient();
+export type { 
+  ChatMessage, 
+  ChatResponse, 
+  AnalysisRequest, 
+  AnalysisResponse, 
+  ReportRequest, 
+  ReportResponse 
+};
