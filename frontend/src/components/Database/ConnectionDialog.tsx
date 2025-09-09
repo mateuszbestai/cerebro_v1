@@ -30,7 +30,6 @@ import {
   VisibilityOff,
   CheckCircle,
   Error as ErrorIcon,
-  Help as HelpIcon,
   Settings as SettingsIcon,
 } from '@mui/icons-material';
 import { databaseApi } from '../../services/databaseApi';
@@ -92,7 +91,7 @@ const ConnectionDialog: React.FC<ConnectionDialogProps> = ({ open, onClose, onCo
       setRecommendedDriver(response.recommended || '');
       
       if (response.recommended && !form.driver) {
-        setForm(prev => ({ ...prev, driver: response.recommended }));
+        setForm(prev => ({ ...prev, driver: response.recommended || '' }));
       }
       
       if (!response.sql_drivers || response.sql_drivers.length === 0) {

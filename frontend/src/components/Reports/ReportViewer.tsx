@@ -21,22 +21,14 @@ import {
   Delete as DeleteIcon,
   Share as ShareIcon,
 } from '@mui/icons-material';
-import { apiClient } from '../../services/api';
+import { apiClient, ReportResponse } from '../../services/api';
 import LoadingSpinner from '../Common/LoadingSpinner';
 import ReportGenerator from './ReportGenerator';
 
-interface Report {
-  id: string;
-  title: string;
-  created_at: string;
-  status: string;
-  format: string;
-}
-
 const ReportViewer: React.FC = () => {
-  const [reports, setReports] = useState<Report[]>([]);
+  const [reports, setReports] = useState<ReportResponse[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedReport, setSelectedReport] = useState<Report | null>(null);
+  const [selectedReport, setSelectedReport] = useState<ReportResponse | null>(null);
   const [generatorOpen, setGeneratorOpen] = useState(false);
   const [viewDialogOpen, setViewDialogOpen] = useState(false);
 
@@ -55,7 +47,7 @@ const ReportViewer: React.FC = () => {
     }
   };
 
-  const handleView = (report: Report) => {
+  const handleView = (report: ReportResponse) => {
     setSelectedReport(report);
     setViewDialogOpen(true);
   };
@@ -101,55 +93,58 @@ const ReportViewer: React.FC = () => {
       </Box>
 
       <Grid container spacing={3}>
-        {reports.map((report) => (
-          <Grid item xs={12} sm={6} md={4} key={report.id}>
-            <Card>
-              <CardContent>
-                <Typography variant="h6" gutterBottom>
-                  {report.title}
-                </Typography>
-                <Box sx={{ mb: 2 }}>
-                  <Chip
-                    label={report.status}
-                    color={getStatusColor(report.status) as any}
+        {reports.map((report) => {
+          const formatLabel = report.url ? (report.url.split('.').pop() || 'N/A').toUpperCase() : 'N/A';
+          return (
+            <Grid item xs={12} sm={6} md={4} key={report.report_id}>
+              <Card>
+                <CardContent>
+                  <Typography variant="h6" gutterBottom>
+                    {report.title}
+                  </Typography>
+                  <Box sx={{ mb: 2 }}>
+                    <Chip
+                      label={report.status}
+                      color={getStatusColor(report.status) as any}
+                      size="small"
+                      sx={{ mr: 1 }}
+                    />
+                    <Chip
+                      label={formatLabel}
+                      size="small"
+                      variant="outlined"
+                    />
+                  </Box>
+                  <Typography variant="body2" color="text.secondary">
+                    Created: {new Date(report.created_at).toLocaleDateString()}
+                  </Typography>
+                </CardContent>
+                <CardActions>
+                  <IconButton
                     size="small"
-                    sx={{ mr: 1 }}
-                  />
-                  <Chip
-                    label={report.format.toUpperCase()}
+                    onClick={() => handleView(report)}
+                    disabled={report.status !== 'completed'}
+                  >
+                    <ViewIcon />
+                  </IconButton>
+                  <IconButton
                     size="small"
-                    variant="outlined"
-                  />
-                </Box>
-                <Typography variant="body2" color="text.secondary">
-                  Created: {new Date(report.created_at).toLocaleDateString()}
-                </Typography>
-              </CardContent>
-              <CardActions>
-                <IconButton
-                  size="small"
-                  onClick={() => handleView(report)}
-                  disabled={report.status !== 'completed'}
-                >
-                  <ViewIcon />
-                </IconButton>
-                <IconButton
-                  size="small"
-                  onClick={() => handleDownload(report.id)}
-                  disabled={report.status !== 'completed'}
-                >
-                  <DownloadIcon />
-                </IconButton>
-                <IconButton size="small">
-                  <ShareIcon />
-                </IconButton>
-                <IconButton size="small" color="error">
-                  <DeleteIcon />
-                </IconButton>
-              </CardActions>
-            </Card>
-          </Grid>
-        ))}
+                    onClick={() => handleDownload(report.report_id)}
+                    disabled={report.status !== 'completed'}
+                  >
+                    <DownloadIcon />
+                  </IconButton>
+                  <IconButton size="small">
+                    <ShareIcon />
+                  </IconButton>
+                  <IconButton size="small" color="error">
+                    <DeleteIcon />
+                  </IconButton>
+                </CardActions>
+              </Card>
+            </Grid>
+          );
+        })}
       </Grid>
 
       <ReportGenerator
@@ -175,7 +170,7 @@ const ReportViewer: React.FC = () => {
           <Button onClick={() => setViewDialogOpen(false)}>Close</Button>
           <Button
             variant="contained"
-            onClick={() => selectedReport && handleDownload(selectedReport.id)}
+            onClick={() => selectedReport && handleDownload(selectedReport.report_id)}
           >
             Download
           </Button>

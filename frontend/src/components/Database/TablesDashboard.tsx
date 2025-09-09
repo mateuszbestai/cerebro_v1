@@ -27,12 +27,7 @@ import {
   CircularProgress,
   Alert,
   Tooltip,
-  List,
-  ListItem,
-  ListItemText,
-  ListItemIcon,
-  Collapse,
-  Badge,
+  Checkbox,
 } from '@mui/material';
 import {
   Search as SearchIcon,
@@ -40,9 +35,6 @@ import {
   TableChart as TableIcon,
   Info as InfoIcon,
   Storage as StorageIcon,
-  ExpandMore as ExpandMoreIcon,
-  ExpandLess as ExpandLessIcon,
-  Code as CodeIcon,
   Analytics as AnalyticsIcon,
   Preview as PreviewIcon,
   Check as CheckIcon,
@@ -70,8 +62,8 @@ interface TableDetails {
     default: any;
     autoincrement: boolean;
   }>;
-  indexes: any[];
-  sample_data: any[];
+  indexes?: any[];
+  sample_data?: any[];
 }
 
 interface DatabaseInfo {

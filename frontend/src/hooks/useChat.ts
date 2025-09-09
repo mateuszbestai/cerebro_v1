@@ -1,15 +1,7 @@
 import { useState, useCallback, useRef } from 'react';
 import { apiClient } from '../services/api';
 import { useDatabase } from './useDatabase';
-
-export interface Message {
-  id: string;
-  role: 'user' | 'assistant';
-  content: string;
-  timestamp: Date;
-  error?: boolean;
-  analysis?: any;
-}
+import { Message } from '../types';
 
 interface ChatHookReturn {
   messages: Message[];
@@ -42,10 +34,10 @@ export function useChat(): ChatHookReturn {
       id: Date.now().toString(),
       role: 'user',
       content,
-      timestamp: new Date(),
+      timestamp: new Date().toISOString(),
     };
     
-    setMessages(prev => [...prev, userMessage]);
+    setMessages((prev: Message[]) => [...prev, userMessage]);
     setIsLoading(true);
 
     try {
@@ -78,22 +70,22 @@ export function useChat(): ChatHookReturn {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
         content: response.response,
-        timestamp: new Date(),
-        analysis: response.analysis,
+        timestamp: new Date().toISOString(),
+        error: !!response.error,
       };
 
-      setMessages(prev => [...prev, assistantMessage]);
+      setMessages((prev: Message[]) => [...prev, assistantMessage]);
 
       // Update current analysis if present
       if (response.analysis) {
         setCurrentAnalysis(response.analysis);
         
         // If there's SQL query result, we might want to execute it
-        if (response.analysis.query && connectionId) {
+        if (response.analysis.sql_query && connectionId) {
           try {
-            const queryResult = await executeQuery(response.analysis.query);
+            const queryResult = await executeQuery(response.analysis.sql_query);
             // Update the analysis with actual results
-            setCurrentAnalysis(prev => ({
+            setCurrentAnalysis((prev: any) => ({
               ...prev,
               data: queryResult.data,
               columns: queryResult.columns,
@@ -115,11 +107,11 @@ export function useChat(): ChatHookReturn {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
         content: `Sorry, I encountered an error: ${error.message || 'Unknown error occurred'}`,
-        timestamp: new Date(),
+        timestamp: new Date().toISOString(),
         error: true,
       };
 
-      setMessages(prev => [...prev, errorMessage]);
+      setMessages((prev: Message[]) => [...prev, errorMessage]);
     } finally {
       setIsLoading(false);
       abortControllerRef.current = null;

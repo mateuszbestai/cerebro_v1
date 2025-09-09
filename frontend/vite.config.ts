@@ -22,8 +22,4 @@ export default defineConfig({
     outDir: 'dist',
     sourcemap: true,
   },
-  define: {
-    'import.meta.env.VITE_API_URL': JSON.stringify(process.env.REACT_APP_API_URL || 'http://localhost:8000/api/v1'),
-    'import.meta.env.VITE_WS_URL': JSON.stringify(process.env.REACT_APP_WS_URL || 'ws://localhost:8000/ws'),
-  },
 })

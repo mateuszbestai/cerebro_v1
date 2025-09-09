@@ -1,7 +1,11 @@
-import axios, { AxiosInstance, CancelToken } from 'axios';
+import axios, { AxiosInstance } from 'axios';
 
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000/api/v1';
-const WS_BASE_URL = process.env.REACT_APP_WS_URL || 'ws://localhost:8000/ws';
+const API_BASE_URL: string = (import.meta.env.VITE_API_URL as string) || '/api/v1';
+const WS_BASE_URL: string = (import.meta.env.VITE_WS_URL as string) || (
+  typeof window !== 'undefined'
+    ? `${window.location.protocol === 'https:' ? 'wss' : 'ws'}://${window.location.host}/api/v1/chat`
+    : ''
+);
 
 interface ChatMessage {
   message: string;
@@ -101,12 +105,12 @@ class ApiClient {
   async sendChatMessage(
     message: string, 
     context?: any,
-    cancelToken?: CancelToken
+    signal?: AbortSignal
   ): Promise<ChatResponse> {
     const response = await this.axiosInstance.post<ChatResponse>(
       '/chat/message',
       { message, context },
-      { cancelToken }
+      { signal }
     );
     return response.data;
   }
@@ -128,7 +132,7 @@ class ApiClient {
       this.wsConnection.close();
     }
 
-    this.wsConnection = new WebSocket(`${WS_BASE_URL}/chat/ws`);
+    this.wsConnection = new WebSocket(`${WS_BASE_URL}/ws`);
 
     this.wsConnection.onopen = () => {
       console.log('WebSocket connected');

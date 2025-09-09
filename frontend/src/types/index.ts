@@ -4,6 +4,7 @@ export interface Message {
     role: 'user' | 'assistant' | 'system';
     timestamp: string;
     error?: boolean;
+    analysis?: any;
     metadata?: Record<string, any>;
   }
   

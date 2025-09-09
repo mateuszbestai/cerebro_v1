@@ -1,20 +1,7 @@
 import React, { createContext, useContext, useState, useCallback, useRef } from 'react';
 import { apiClient } from '../services/api';
 import { useDatabase } from '../hooks/useDatabase';
-
-export interface Message {
-  id: string;
-  role: 'user' | 'assistant' | 'system';
-  content: string;
-  timestamp: Date;
-  error?: boolean;
-  analysis?: any;
-  metadata?: {
-    sql_query?: string;
-    table_context?: string[];
-    execution_time?: number;
-  };
-}
+import { Message } from '../types';
 
 interface ChatContextType {
   // State
@@ -87,7 +74,7 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
       id: `msg_${Date.now()}`,
       role: 'user',
       content,
-      timestamp: new Date(),
+      timestamp: new Date().toISOString(),
       metadata: {
         table_context: selectedTables,
       }
@@ -159,7 +146,7 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
         id: `msg_${Date.now() + 1}`,
         role: 'assistant',
         content: response.response,
-        timestamp: new Date(),
+        timestamp: new Date().toISOString(),
         analysis: enrichedAnalysis,
         metadata: {
           sql_query: enrichedAnalysis?.sql_query,
@@ -188,7 +175,7 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
         id: `msg_${Date.now() + 1}`,
         role: 'assistant',
         content: `I encountered an error: ${errorMessage}`,
-        timestamp: new Date(),
+        timestamp: new Date().toISOString(),
         error: true,
       };
 
@@ -255,7 +242,7 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
             id: `msg_${Date.now()}`,
             role: 'assistant',
             content: data.content,
-            timestamp: new Date(),
+            timestamp: new Date().toISOString(),
             analysis: data.analysis,
           };
           setMessages(prev => [...prev, wsMessage]);
@@ -292,7 +279,7 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
             id: msg.id || `msg_${Date.now()}_${Math.random()}`,
             role: msg.role as 'user' | 'assistant',
             content: msg.content,
-            timestamp: new Date(msg.timestamp),
+            timestamp: msg.timestamp,
             analysis: msg.analysis,
             metadata: msg.metadata,
           }));
@@ -303,8 +290,8 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
       }
     };
 
-    // Uncomment to load history on mount
-    // loadHistory();
+    // Load history on mount
+    loadHistory();
   }, []);
 
   const value: ChatContextType = {

@@ -22,8 +22,8 @@ export const useAnalysis = () => {
       dispatch(setError(undefined));
 
       try {
-        const response = await apiClient.runAnalysis(query, data);
-        const analysisId = response.data.analysis_id;
+        const response = await apiClient.runAnalysis({ query, data });
+        const analysisId = response.analysis_id;
 
         // Poll for results
         let attempts = 0;
@@ -37,13 +37,13 @@ export const useAnalysis = () => {
 
           const resultResponse = await apiClient.getAnalysisResults(analysisId);
           
-          if (resultResponse.data.status === 'completed') {
-            const result: AnalysisResult = resultResponse.data.result;
+          if (resultResponse.status === 'completed') {
+            const result: AnalysisResult = resultResponse.result;
             dispatch(setCurrentResult(result));
             dispatch(setResults([...results, result]));
             return;
-          } else if (resultResponse.data.status === 'failed') {
-            throw new Error(resultResponse.data.error || 'Analysis failed');
+          } else if (resultResponse.status === 'failed') {
+            throw new Error(resultResponse.error || 'Analysis failed');
           }
 
           attempts++;

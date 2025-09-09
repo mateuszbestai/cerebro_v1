@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
@@ -39,7 +39,7 @@ const theme = createTheme({
 });
 
 function AppContent() {
-  const { isConnected, connectionId } = useDatabase();
+  const { isConnected } = useDatabase();
   const [connectionDialogOpen, setConnectionDialogOpen] = useState(false);
   const [showWelcome, setShowWelcome] = useState(true);
 
@@ -55,6 +55,8 @@ function AppContent() {
   }, [isConnected, showWelcome]);
 
   const handleConnectionSuccess = (connectionId: string) => {
+    // Connected successfully; closing dialog
+    console.debug('Database connected with id:', connectionId);
     setConnectionDialogOpen(false);
     // Optionally navigate to tables dashboard
     // navigate('/database');

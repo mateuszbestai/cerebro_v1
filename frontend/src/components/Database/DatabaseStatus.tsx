@@ -168,7 +168,7 @@ const DatabaseStatus: React.FC<DatabaseStatusProps> = ({ onConnect }) => {
       </Box>
 
       {/* Expandable Details Section */}
-      <Collapse in={showDetails && isConnected && databaseInfo}>
+      <Collapse in={showDetails && isConnected && !!databaseInfo}>
         <Box sx={{ mt: 2, p: 2, bgcolor: 'grey.50', borderRadius: 1 }}>
           <Typography variant="subtitle2" gutterBottom>
             Connection Details
