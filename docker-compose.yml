@@ -6,6 +6,8 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     container_name: ai-analysis-backend
+    ports:
+      - "8000:8000"
     environment:
       - AZURE_SQL_SERVER=${AZURE_SQL_SERVER}
       - AZURE_SQL_DATABASE=${AZURE_SQL_DATABASE}
