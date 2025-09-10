@@ -88,6 +88,17 @@ async def perform_analysis(analysis_id: str, request: AnalysisRequest):
             result["data"] = pandas_result["data"]
             result["analysis"] = pandas_result["analysis"]
             result["statistics"] = pandas_result.get("statistics")
+
+            # Generate visualization if requested (mirror SQL behavior)
+            if request.visualization_required:
+                try:
+                    # Prefer the input dataset if provided; fall back to pandas output if chartable
+                    dataset_for_chart = request.data if request.data is not None else pandas_result.get("data")
+                    if dataset_for_chart:
+                        viz = await viz_tool.create_chart(dataset_for_chart)
+                        result["visualization"] = viz
+                except Exception as viz_err:
+                    logger.error(f"Visualization error (pandas flow): {str(viz_err)}")
         
         else:
             # General analysis using LLM

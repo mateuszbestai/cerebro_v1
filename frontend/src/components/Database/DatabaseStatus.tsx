@@ -20,7 +20,7 @@ import {
   Info as InfoIcon,
   Close as CloseIcon,
 } from '@mui/icons-material';
-import { useDatabase } from '../../hooks/useDatabase';
+import { useDatabase } from '../../contexts/DatabaseContext';
 
 interface DatabaseStatusProps {
   onConnect: () => void;

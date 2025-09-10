@@ -33,11 +33,11 @@ import {
   Settings as SettingsIcon,
 } from '@mui/icons-material';
 import { databaseApi } from '../../services/databaseApi';
+import { useDatabase } from '../../contexts/DatabaseContext';
 
 interface ConnectionDialogProps {
   open: boolean;
   onClose: () => void;
-  onConnect: (connectionId: string) => void;
 }
 
 interface ConnectionForm {
@@ -52,7 +52,8 @@ interface ConnectionForm {
   connectionTimeout: number;
 }
 
-const ConnectionDialog: React.FC<ConnectionDialogProps> = ({ open, onClose, onConnect }) => {
+const ConnectionDialog: React.FC<ConnectionDialogProps> = ({ open, onClose }) => {
+  const { connect: connectToDatabase } = useDatabase();
   const [activeStep, setActiveStep] = useState(0);
   const [form, setForm] = useState<ConnectionForm>({
     server: '',
@@ -80,6 +81,13 @@ const ConnectionDialog: React.FC<ConnectionDialogProps> = ({ open, onClose, onCo
 
   useEffect(() => {
     if (open) {
+      // Reset transient UI state when dialog opens
+      setError('');
+      setSuccess('');
+      setTesting(false);
+      setLoading(false);
+      setConnectionTested(false);
+      // Do not reset form here to preserve user input
       loadAvailableDrivers();
     }
   }, [open]);
@@ -140,7 +148,9 @@ const ConnectionDialog: React.FC<ConnectionDialogProps> = ({ open, onClose, onCo
       const response = await databaseApi.testConnection(form);
       
       if (response.success) {
-        setSuccess('Connection successful! Click "Connect" to proceed.');
+        // Clear any stale errors from previous attempts
+        setError('');
+        setSuccess('Connection successful! Click \"Connect\" to proceed.');
         setConnectionTested(true);
         setActiveStep(2);
       } else {
@@ -169,19 +179,16 @@ const ConnectionDialog: React.FC<ConnectionDialogProps> = ({ open, onClose, onCo
     setError('');
 
     try {
-      const response = await databaseApi.connect(form);
+      // Use the database context connect method which updates the global state
+      await connectToDatabase(form);
       
-      if (response.status === 'connected') {
-        setSuccess('Connected successfully!');
-        setTimeout(() => {
-          onConnect(response.connection_id);
-          handleClose();
-        }, 500);
-      } else {
-        setError(response.message || 'Connection failed');
-      }
+      setSuccess('Connected successfully!');
+      setTimeout(() => {
+        handleClose();
+      }, 500);
     } catch (err: any) {
-      setError(err.message || 'Failed to connect');
+      const errorMessage = err.response?.data?.detail || err.message || 'Failed to connect';
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }

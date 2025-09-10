@@ -22,8 +22,8 @@ import {
   Refresh as RefreshIcon,
   Warning as WarningIcon,
 } from '@mui/icons-material';
-import { useChat } from '../../hooks/useChat';
-import { useDatabase } from '../../hooks/useDatabase';
+import { useChat } from '../../contexts/ChatContext';
+import { useDatabase } from '../../contexts/DatabaseContext';
 import MessageList from './MessageList';
 import MessageInput from './MessageInput';
 import ChartDisplay from '../Analysis/ChartDisplay';

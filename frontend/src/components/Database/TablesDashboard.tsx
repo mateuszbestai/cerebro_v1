@@ -42,7 +42,7 @@ import {
   ContentCopy as CopyIcon,
 } from '@mui/icons-material';
 import { databaseApi } from '../../services/databaseApi';
-import { useDatabase } from '../../hooks/useDatabase';
+import { useDatabase } from '../../contexts/DatabaseContext';
 
 interface TableInfo {
   name: string;
@@ -66,48 +66,41 @@ interface TableDetails {
   sample_data?: any[];
 }
 
-interface DatabaseInfo {
-  database_name: string;
-  server_version: string;
-  tables_count: number;
-  total_size_mb: number;
-  collation: string;
-}
+// DatabaseInfo interface is imported from useDatabase context, no need to redefine
 
 const TablesDashboard: React.FC = () => {
-  const { connectionId, selectedTables, setSelectedTables, disconnect } = useDatabase();
+  const { 
+    connectionId, 
+    selectedTables, 
+    setSelectedTables, 
+    disconnect,
+    databaseInfo,
+    tables: contextTables,
+    refreshTables,
+    isConnected
+  } = useDatabase();
   const [tables, setTables] = useState<TableInfo[]>([]);
   const [filteredTables, setFilteredTables] = useState<TableInfo[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedTable, setSelectedTable] = useState<string | null>(null);
   const [tableDetails, setTableDetails] = useState<TableDetails | null>(null);
   const [detailsDialogOpen, setDetailsDialogOpen] = useState(false);
   const [activeTab, setActiveTab] = useState(0);
-  const [databaseInfo, setDatabaseInfo] = useState<DatabaseInfo | null>(null);
   const [error, setError] = useState<string>('');
 
   useEffect(() => {
-    if (connectionId) {
-      loadDatabaseInfo();
-      loadTables();
+    // Use tables from context instead of loading separately
+    if (contextTables && contextTables.length > 0) {
+      setTables(contextTables);
     }
-  }, [connectionId]);
+  }, [contextTables]);
 
   useEffect(() => {
     filterTables();
   }, [searchTerm, tables]);
 
-  const loadDatabaseInfo = async () => {
-    if (!connectionId) return;
-    
-    try {
-      const info = await databaseApi.getDatabaseInfo(connectionId);
-      setDatabaseInfo(info);
-    } catch (err) {
-      console.error('Error loading database info:', err);
-    }
-  };
+  // Database info comes from context now, no need to load separately
 
   const loadTables = async () => {
     if (!connectionId) return;
@@ -116,8 +109,8 @@ const TablesDashboard: React.FC = () => {
     setError('');
     
     try {
-      const response = await databaseApi.getTables(connectionId);
-      setTables(response.tables);
+      // Use the refreshTables from context
+      await refreshTables();
     } catch (err: any) {
       setError('Failed to load tables: ' + err.message);
     } finally {
@@ -180,7 +173,7 @@ const TablesDashboard: React.FC = () => {
     return num.toLocaleString();
   };
 
-  if (!connectionId) {
+  if (!isConnected || !connectionId) {
     return (
       <Box sx={{ p: 3, textAlign: 'center' }}>
         <Alert severity="info">

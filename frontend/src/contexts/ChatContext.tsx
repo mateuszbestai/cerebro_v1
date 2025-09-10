@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useCallback, useRef } from 'react';
 import { apiClient } from '../services/api';
-import { useDatabase } from '../hooks/useDatabase';
+import { useDatabase } from '../contexts/DatabaseContext';
 import { Message } from '../types';
 
 interface ChatContextType {

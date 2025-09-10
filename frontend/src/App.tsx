@@ -19,7 +19,7 @@ import { DatabaseProvider } from './contexts/DatabaseContext';
 import { ChatProvider } from './contexts/ChatContext';
 
 // Hooks
-import { useDatabase } from './hooks/useDatabase';
+import { useDatabase } from './contexts/DatabaseContext';
 
 const theme = createTheme({
   palette: {
@@ -54,13 +54,6 @@ function AppContent() {
     }
   }, [isConnected, showWelcome]);
 
-  const handleConnectionSuccess = (connectionId: string) => {
-    // Connected successfully; closing dialog
-    console.debug('Database connected with id:', connectionId);
-    setConnectionDialogOpen(false);
-    // Optionally navigate to tables dashboard
-    // navigate('/database');
-  };
 
   return (
     <>
@@ -71,7 +64,6 @@ function AppContent() {
       <ConnectionDialog
         open={connectionDialogOpen}
         onClose={() => setConnectionDialogOpen(false)}
-        onConnect={handleConnectionSuccess}
       />
 
       {/* Main Routes */}

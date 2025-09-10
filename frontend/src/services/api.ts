@@ -69,7 +69,7 @@ class ApiClient {
       headers: {
         'Content-Type': 'application/json',
       },
-      timeout: 30000, // 30 seconds
+      timeout: 60000, // 60 seconds (chat/orchestrator can take longer on first run)
     });
 
     // Request interceptor

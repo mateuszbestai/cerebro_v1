@@ -7,6 +7,7 @@ from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.exc import SQLAlchemyError
 import hashlib
 import json
+from datetime import datetime
 
 from app.utils.logger import setup_logger
 
@@ -117,12 +118,23 @@ async def connect_to_database(request: ConnectionRequest):
         # Build connection string
         conn_str = build_connection_string(request)
         
-        # Test connection
-        engine = create_engine(conn_str, pool_pre_ping=True, pool_size=5, max_overflow=10)
+        # Test connection (with timeout) and prepare engine for reuse
+        engine = create_engine(
+            conn_str,
+            pool_pre_ping=True,
+            pool_size=5,
+            max_overflow=10,
+            connect_args={"timeout": 10}
+        )
         
-        # Test with a simple query
+        # Test with a simple query - avoid @@VERSION which can cause issues
         with engine.connect() as conn:
-            result = conn.execute(text("SELECT @@VERSION as version, DB_NAME() as db_name"))
+            result = conn.execute(text("""
+                SELECT 
+                    DB_NAME() as db_name,
+                    CONVERT(NVARCHAR(128), SERVERPROPERTY('ProductVersion')) as version,
+                    CONVERT(NVARCHAR(128), SERVERPROPERTY('Edition')) as edition
+            """))
             server_info = dict(result.fetchone()._mapping)
         
         # Generate connection ID
@@ -135,7 +147,7 @@ async def connect_to_database(request: ConnectionRequest):
             "database": request.database,
             "username": request.username,
             "driver": request.driver,
-            "connected_at": logger.datetime.now().isoformat()
+            "connected_at": datetime.utcnow().isoformat()
         }
         
         return ConnectionResponse(
@@ -264,14 +276,24 @@ async def get_database_info(connection_id: str) -> DatabaseInfo:
         engine = active_connections[connection_id]["engine"]
         
         with engine.connect() as conn:
-            # Get database info
-            info_query = text("""
+            # Get database info - avoid @@VERSION which can return XML type
+            # Get database name
+            db_name_query = text("SELECT DB_NAME() as database_name")
+            db_name = conn.execute(db_name_query).scalar()
+            
+            # Get server version in a safer way
+            version_query = text("""
                 SELECT 
-                    DB_NAME() as database_name,
-                    @@VERSION as server_version,
-                    DATABASEPROPERTYEX(DB_NAME(), 'Collation') as collation
+                    CONVERT(NVARCHAR(128), SERVERPROPERTY('ProductVersion')) as version,
+                    CONVERT(NVARCHAR(128), SERVERPROPERTY('ProductLevel')) as level,
+                    CONVERT(NVARCHAR(128), SERVERPROPERTY('Edition')) as edition
             """)
-            info = dict(conn.execute(info_query).fetchone()._mapping)
+            version_info = dict(conn.execute(version_query).fetchone()._mapping)
+            server_version = f"Microsoft SQL Server {version_info['version']} {version_info['level']} {version_info['edition']}"
+            
+            # Get collation (cast from sql_variant to NVARCHAR)
+            collation_query = text("SELECT CONVERT(NVARCHAR(128), DATABASEPROPERTYEX(DB_NAME(), 'Collation')) as collation")
+            collation = conn.execute(collation_query).scalar()
             
             # Get table count
             count_query = text("""
@@ -281,21 +303,32 @@ async def get_database_info(connection_id: str) -> DatabaseInfo:
             """)
             table_count = conn.execute(count_query).scalar()
             
-            # Get database size
-            size_query = text("""
-                SELECT 
-                    SUM(size * 8.0 / 1024) as size_mb
-                FROM sys.master_files
-                WHERE database_id = DB_ID()
-            """)
-            size_mb = conn.execute(size_query).scalar()
+            # Get database size (use sys.database_files which is available in Azure SQL and on-prem)
+            try:
+                size_query = text("""
+                    SELECT 
+                        SUM(CAST(size AS BIGINT)) * 8.0 / 1024 AS size_mb
+                    FROM sys.database_files
+                """)
+                size_mb = conn.execute(size_query).scalar()
+            except Exception:
+                # Fallback to data file size only (file_id = 1) if aggregate fails
+                try:
+                    size_query = text("""
+                        SELECT CAST(size AS BIGINT) * 8.0 / 1024 AS size_mb
+                        FROM sys.database_files
+                        WHERE file_id = 1
+                    """)
+                    size_mb = conn.execute(size_query).scalar()
+                except Exception:
+                    size_mb = None
         
         return DatabaseInfo(
-            database_name=info['database_name'],
-            server_version=info['server_version'].split('\n')[0],  # First line only
+            database_name=db_name,
+            server_version=server_version,
             tables_count=table_count,
             total_size_mb=float(size_mb) if size_mb else None,
-            collation=info['collation']
+            collation=collation
         )
         
     except Exception as e:
@@ -429,75 +462,86 @@ async def get_table_details(
             detail=str(e)
         )
 
-@router.post("/execute-query/{connection_id}")
-async def execute_query(connection_id: str, query: str, limit: int = 100):
-    """Execute a SQL query on the connected database"""
+class QueryRequest(BaseModel):
+    """SQL query request model"""
+    query: str
+    limit: int = 100
+
+async def execute_query_internal(connection_id: str, query: str, limit: int = 100):
+    """Core query executor used by both API route and internal calls"""
     if connection_id not in active_connections:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Connection not found"
         )
-    
+
     try:
         engine = active_connections[connection_id]["engine"]
-        
-        # Add LIMIT if it's a SELECT query without one
-        if query.strip().upper().startswith("SELECT") and "LIMIT" not in query.upper() and "TOP" not in query.upper():
-            query = query.replace("SELECT", f"SELECT TOP {limit}", 1)
-        
+        # Normalize and apply TOP limit for SELECT without explicit TOP/LIMIT
+        q = query.strip()
+        if q.upper().startswith("SELECT") and " LIMIT " not in q.upper() and " TOP " not in q.upper():
+            q = q.replace("SELECT", f"SELECT TOP {limit}", 1)
+
         with engine.connect() as conn:
-            result = conn.execute(text(query))
-            
-            # Check if query returns results
+            result = conn.execute(text(q))
+
             if result.returns_rows:
                 rows = result.fetchall()
                 columns = list(result.keys())
-                
-                data = []
-                for row in rows:
-                    data.append(dict(row._mapping))
-                
+                data = [dict(row._mapping) for row in rows]
                 return {
                     "success": True,
                     "columns": columns,
                     "data": data,
                     "row_count": len(data),
-                    "query": query
+                    "query": q,
                 }
             else:
                 return {
                     "success": True,
                     "message": "Query executed successfully",
                     "rows_affected": result.rowcount,
-                    "query": query
+                    "query": q,
                 }
-                
     except Exception as e:
         logger.error(f"Error executing query: {str(e)}")
-        return {
-            "success": False,
-            "error": str(e),
-            "query": query
-        }
+        return {"success": False, "error": str(e), "query": query}
+
+@router.post("/execute-query/{connection_id}")
+async def execute_query(connection_id: str, request: QueryRequest):
+    """API route wrapper that delegates to internal executor"""
+    return await execute_query_internal(connection_id, request.query, request.limit)
 
 def build_connection_string(request: ConnectionRequest) -> str:
-    """Build SQL Server connection string"""
-    driver = request.driver.replace(" ", "+")
-    
-    conn_str = (
-        f"mssql+pyodbc://{request.username}:{request.password}@"
-        f"{request.server},{request.port}/{request.database}?"
-        f"driver={driver}"
-    )
-    
-    # Add additional parameters
+    """Build SQL Server connection string
+    Use explicit ODBC connection string via odbc_connect to ensure FreeTDS compatibility
+    (Server/Port params and TDS_Version) across architectures.
+    """
+    import urllib.parse
+
+    driver = request.driver
+    # Build a DSN-less ODBC connection string
+    parts = [
+        f"Driver={{{driver}}}",
+        f"Server={request.server}",  # hostname only; Port specified separately
+        f"Port={request.port}",
+        f"Database={request.database}",
+        f"UID={request.username}",
+        f"PWD={request.password}",
+        "TDS_Version=7.4",
+        "ClientCharset=UTF-8",
+        f"Connection Timeout={request.connection_timeout}",
+    ]
+
     if request.encrypt:
-        conn_str += "&Encrypt=yes"
+        parts.append("Encrypt=Yes")
     if request.trust_server_certificate:
-        conn_str += "&TrustServerCertificate=yes"
-    
-    conn_str += f"&Connection+Timeout={request.connection_timeout}"
-    
+        parts.append("TrustServerCertificate=Yes")
+
+    odbc_str = ";".join(parts)
+    encoded = urllib.parse.quote_plus(odbc_str)
+    # Use SQLAlchemy/pyodbc URI with odbc_connect
+    conn_str = f"mssql+pyodbc:///?odbc_connect={encoded}"
     return conn_str
 
 def generate_connection_id(request: ConnectionRequest) -> str:

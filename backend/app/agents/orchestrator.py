@@ -6,6 +6,7 @@ from app.services.azure_openai import AzureOpenAIService
 from app.tools.visualization import VisualizationTool
 from app.tools.report_tools import ReportGenerationTool
 from app.api.routes.database import active_connections
+from app.agents.pandas_agent import PandasAgent
 
 logger = logging.getLogger(__name__)
 
@@ -16,6 +17,8 @@ class AgentOrchestrator:
         self.llm_service = AzureOpenAIService()
         self.visualization_tool = VisualizationTool()
         self.report_tool = ReportGenerationTool()
+        # Initialize pandas agent for DataFrame analysis
+        self.pandas_agent = PandasAgent(self.llm_service.get_llm())
         self.memory = ConversationBufferMemory(
             memory_key="chat_history",
             return_messages=True
@@ -56,13 +59,14 @@ class AgentOrchestrator:
                     intent
                 )
                 
-            elif intent["type"] == "data_analysis" and connection_id:
-                # Analyze data using the connected database
+            elif intent["type"] == "data_analysis" and (connection_id or (context and context.get("data"))):
+                # Analyze data using the connected database or provided dataset
                 result = await self._handle_data_analysis(
                     query,
                     connection_id,
                     database_context,
-                    context.get("data") if context else None
+                    context.get("data") if context else None,
+                    intent
                 )
                 
             elif intent["type"] == "report_generation":
@@ -121,8 +125,8 @@ class AgentOrchestrator:
             sql_query = await self._generate_sql_query(query, database_context)
             
             # Execute the query
-            from app.api.routes.database import execute_query
-            query_result = await execute_query(connection_id, sql_query)
+            from app.api.routes.database import execute_query_internal
+            query_result = await execute_query_internal(connection_id, sql_query)
             
             if query_result["success"]:
                 # Generate explanation of results
@@ -186,24 +190,53 @@ class AgentOrchestrator:
         Rules:
         1. Use only the tables mentioned in the database context
         2. Include appropriate JOINs if multiple tables are needed
-        3. Add LIMIT 100 to prevent large result sets unless specifically asked for more
-        4. Use proper SQL syntax for SQL Server
-        5. Return ONLY the SQL query, no explanation
+        3. If needed, limit rows to 100 using SQL Server syntax (TOP 100 in the final SELECT). Do NOT use LIMIT.
+        4. Always use COUNT(*) when counting rows (not COUNT()).
+        5. Use proper SQL Server syntax (e.g., TOP, OFFSET/FETCH, ISNULL, CONVERT, etc.).
+        6. Return ONLY the SQL query, no explanation.
         
         SQL Query:
         """
         
         sql_query = await self.llm_service.generate_response(prompt)
         
-        # Clean up the query
+        # Clean up and sanitize the query for SQL Server
         sql_query = sql_query.strip()
         if sql_query.startswith("```sql"):
             sql_query = sql_query[6:]
         if sql_query.endswith("```"):
             sql_query = sql_query[:-3]
         
-        return sql_query.strip()
+        sql_query = self._sanitize_sql_for_sqlserver(sql_query.strip())
+        return sql_query
     
+    def _sanitize_sql_for_sqlserver(self, sql: str) -> str:
+        """Make small, safe fixes to LLM SQL for SQL Server.
+        - Replace COUNT() with COUNT(*)
+        - Convert trailing "LIMIT n" into "TOP n" in the final SELECT
+        """
+        import re
+        s = sql
+        # Fix COUNT()
+        s = re.sub(r"\bCOUNT\(\s*\)\b", "COUNT(*)", s, flags=re.IGNORECASE)
+        
+        # Convert trailing LIMIT n to TOP n in final SELECT
+        m = re.search(r"LIMIT\s+(\d+)\s*;?\s*$", s, flags=re.IGNORECASE)
+        if m:
+            n = m.group(1)
+            # remove the LIMIT clause at the end
+            s = s[:m.start()].rstrip()
+            # find the last SELECT or SELECT DISTINCT
+            matches = list(re.finditer(r"\bSELECT\s+(?:DISTINCT\s+)?", s, flags=re.IGNORECASE))
+            if matches:
+                last = matches[-1]
+                insertion = last.group(0) + f"TOP {n} "
+                s = s[:last.start()] + insertion + s[last.end():]
+            else:
+                # if we can't find SELECT, just append FETCH NEXT syntax as fallback
+                s = s + f" OFFSET 0 ROWS FETCH NEXT {n} ROWS ONLY"
+        return s
+
     async def _explain_sql_results(
         self, 
         original_query: str,
@@ -247,48 +280,79 @@ class AgentOrchestrator:
     async def _handle_data_analysis(
         self,
         query: str,
-        connection_id: str,
+        connection_id: Optional[str],
         database_context: str,
-        existing_data: Optional[Any] = None
+        existing_data: Optional[Any] = None,
+        intent: Optional[Dict[str, Any]] = None
     ) -> Dict[str, Any]:
-        """Handle data analysis requests"""
+        """Handle data analysis requests using the PandasAgent when possible"""
         
-        # If we have existing data, analyze it
-        if existing_data:
-            analysis = await self._analyze_existing_data(query, existing_data)
-            return {
-                "query": query,
-                "intent": {"type": "data_analysis"},
-                "response": analysis,
-                "data": existing_data
-            }
-        
-        # Otherwise, fetch data from database first
-        sql_query = await self._generate_sql_query(query, database_context)
-        
-        from app.api.routes.database import execute_query
-        query_result = await execute_query(connection_id, sql_query)
-        
-        if query_result["success"] and query_result.get("data"):
-            analysis = await self._analyze_existing_data(query, query_result["data"])
+        try:
+            # If we have existing data, analyze it directly
+            data_for_analysis = existing_data
+            sql_query = None
+            if data_for_analysis is None:
+                # If no dataset was provided, we need a connection to fetch data
+                if not connection_id:
+                    return {
+                        "query": query,
+                        "intent": {"type": "data_analysis"},
+                        "response": "No dataset provided and no database connection available to fetch data.",
+                        "error": "Missing data source"
+                    }
+                # Fetch data from database first
+                sql_query = await self._generate_sql_query(query, database_context)
+                from app.api.routes.database import execute_query_internal
+                query_result = await execute_query_internal(connection_id, sql_query)
+                if not (query_result.get("success") and query_result.get("data")):
+                    return {
+                        "query": query,
+                        "intent": {"type": "data_analysis"},
+                        "response": "Unable to fetch data for analysis",
+                        "error": query_result.get("error")
+                    }
+                data_for_analysis = query_result["data"]
             
-            return {
+            # Run pandas agent analysis
+            pandas_result = await self.pandas_agent.analyze_data(
+                query,
+                data=data_for_analysis
+            )
+            
+            result: Dict[str, Any] = {
                 "query": query,
-                "intent": {"type": "data_analysis"},
-                "response": analysis,
-                "data": query_result["data"],
-                "sql_query": sql_query
+                "intent": {"type": "data_analysis"} if intent is None else intent,
+                "response": pandas_result.get("analysis"),
+                "data": data_for_analysis,
             }
-        else:
+            if sql_query:
+                result["sql_query"] = sql_query
+            if pandas_result.get("statistics") is not None:
+                result["statistics"] = pandas_result.get("statistics")
+            
+            # Optionally generate visualization
+            if (intent or {}).get("needs_visualization") and data_for_analysis:
+                try:
+                    viz = await self.visualization_tool.create_chart(
+                        data_for_analysis,
+                        (intent or {}).get("chart_type", "auto")
+                    )
+                    result["visualization"] = viz
+                except Exception as viz_err:
+                    logger.error(f"Error creating visualization for analysis: {viz_err}")
+            
+            return result
+        except Exception as e:
+            logger.error(f"Error handling data analysis: {str(e)}")
             return {
                 "query": query,
                 "intent": {"type": "data_analysis"},
-                "response": "Unable to fetch data for analysis",
-                "error": query_result.get("error")
+                "response": f"Analysis failed: {str(e)}",
+                "error": str(e)
             }
     
     async def _analyze_existing_data(self, query: str, data: Any) -> str:
-        """Analyze existing data"""
+        """Analyze existing data (fallback path if pandas agent unavailable)"""
         
         import pandas as pd
         import json
@@ -301,7 +365,7 @@ class AgentOrchestrator:
             stats = {
                 "shape": df.shape,
                 "columns": df.columns.tolist(),
-                "dtypes": df.dtypes.to_dict(),
+                "dtypes": {k: str(v) for k, v in df.dtypes.to_dict().items()},
                 "null_counts": df.isnull().sum().to_dict(),
                 "summary": df.describe().to_dict() if len(df.select_dtypes(include=['number']).columns) > 0 else {}
             }
