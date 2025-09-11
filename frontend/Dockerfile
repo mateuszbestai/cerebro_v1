@@ -1,9 +1,10 @@
-FROM node:18-alpine AS build
+FROM node:20-alpine AS build
 
 WORKDIR /app
 
 COPY package*.json ./
-RUN npm ci
+# Use npm install to allow lockfile updates during build (we pin via package-lock in repo when available)
+RUN npm install
 COPY . .
 ENV NODE_OPTIONS=--max-old-space-size=4096
 RUN npm run build

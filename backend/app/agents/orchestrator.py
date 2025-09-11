@@ -39,6 +39,9 @@ class AgentOrchestrator:
             
             # Analyze query intent with database context
             intent = await self._analyze_intent(query, database_context)
+
+            # Optional hints from frontend
+            selected_tables = context.get("selected_tables") if context else None
             
             result = {
                 "query": query,
@@ -56,7 +59,8 @@ class AgentOrchestrator:
                     query, 
                     connection_id, 
                     database_context,
-                    intent
+                    intent,
+                    selected_tables
                 )
                 
             elif intent["type"] == "data_analysis" and (connection_id or (context and context.get("data"))):
@@ -66,7 +70,8 @@ class AgentOrchestrator:
                     connection_id,
                     database_context,
                     context.get("data") if context else None,
-                    intent
+                    intent,
+                    selected_tables
                 )
                 
             elif intent["type"] == "report_generation":
@@ -107,7 +112,8 @@ class AgentOrchestrator:
         query: str, 
         connection_id: str,
         database_context: str,
-        intent: Dict[str, Any]
+        intent: Dict[str, Any],
+        selected_tables: Optional[List[str]] = None
     ) -> Dict[str, Any]:
         """Handle SQL queries using the frontend connection"""
         
@@ -121,12 +127,27 @@ class AgentOrchestrator:
             }
         
         try:
-            # Generate SQL query using LLM with database context
-            sql_query = await self._generate_sql_query(query, database_context)
+            # Generate SQL query using LLM with database context and optional schema
+            sql_query = await self._generate_sql_query(
+                query,
+                database_context,
+                connection_id=connection_id,
+                selected_tables=selected_tables,
+            )
             
             # Execute the query
             from app.api.routes.database import execute_query_internal
             query_result = await execute_query_internal(connection_id, sql_query)
+
+            # If column name errors occur, retry once with schema details
+            if not query_result.get("success") and "Invalid column name" in (query_result.get("error") or ""):
+                sql_query = await self._generate_sql_query(
+                    query,
+                    database_context,
+                    connection_id=connection_id,
+                    selected_tables=selected_tables,
+                )
+                query_result = await execute_query_internal(connection_id, sql_query)
             
             if query_result["success"]:
                 # Generate explanation of results
@@ -176,24 +197,39 @@ class AgentOrchestrator:
                 "error": str(e)
             }
     
-    async def _generate_sql_query(self, natural_language: str, database_context: str) -> str:
+    async def _generate_sql_query(self, natural_language: str, database_context: str, connection_id: Optional[str] = None, selected_tables: Optional[List[str]] = None) -> str:
         """Generate SQL query from natural language using database context"""
         
+        # Optionally include concrete schema details for selected tables
+        schema_context = ""
+        if connection_id and selected_tables:
+            try:
+                schema_context = await self._build_schema_context(connection_id, selected_tables)
+            except Exception as e:
+                logger.debug(f"Schema context build failed: {e}")
+
+        # Build schema section separately to avoid f-string backslash issues
+        schema_section = f"Schema Details for Selected Tables:\n{schema_context}" if schema_context else ""
+
         prompt = f"""
         Database Context:
         {database_context}
         
+        {schema_section}
+        
         User Query: {natural_language}
         
-        Generate a SQL query to answer the user's question.
+        Generate an optimized SQL query to answer the user's question.
+        Use only the columns that exist in the schema details above (if provided).
+        Prefer the selected tables if they are relevant.
         
-        Rules:
-        1. Use only the tables mentioned in the database context
+        Technical Requirements:
+        1. Use only the tables mentioned in the database context or the selected tables provided
         2. Include appropriate JOINs if multiple tables are needed
-        3. If needed, limit rows to 100 using SQL Server syntax (TOP 100 in the final SELECT). Do NOT use LIMIT.
-        4. Always use COUNT(*) when counting rows (not COUNT()).
-        5. Use proper SQL Server syntax (e.g., TOP, OFFSET/FETCH, ISNULL, CONVERT, etc.).
-        6. Return ONLY the SQL query, no explanation.
+        3. If needed, limit rows to 100 using SQL Server syntax (TOP 100 in the final SELECT)
+        4. Always use COUNT(*) when counting rows
+        5. Use proper SQL Server syntax (TOP, OFFSET/FETCH, ISNULL, CONVERT, etc.)
+        6. Return ONLY the SQL query, no explanation
         
         SQL Query:
         """
@@ -210,6 +246,23 @@ class AgentOrchestrator:
         sql_query = self._sanitize_sql_for_sqlserver(sql_query.strip())
         return sql_query
     
+    async def _build_schema_context(self, connection_id: str, tables: List[str]) -> str:
+        """Build a compact schema description for the given tables."""
+        try:
+            from app.api.routes.database import get_table_details
+            lines: List[str] = []
+            for t in tables[:5]:  # cap at 5 tables to keep prompt small
+                try:
+                    info = await get_table_details(connection_id, t, include_sample=False)
+                    col_names = [c["name"] for c in info.columns]
+                    lines.append(f"- {t}: columns = {', '.join(col_names[:40])}{' ...' if len(col_names) > 40 else ''}")
+                except Exception as e:
+                    logger.debug(f"schema fetch failed for {t}: {e}")
+            return "\n".join(lines)
+        except Exception as e:
+            logger.debug(f"schema context error: {e}")
+            return ""
+
     def _sanitize_sql_for_sqlserver(self, sql: str) -> str:
         """Make small, safe fixes to LLM SQL for SQL Server.
         - Replace COUNT() with COUNT(*)
@@ -262,17 +315,24 @@ class AgentOrchestrator:
         prompt = f"""
         User asked: {original_query}
         
-        SQL Query executed:
-        {sql_query}
-        
+        Query Results:
         {data_summary}
         
-        Provide a clear, concise explanation of:
-        1. What the query did
-        2. Key findings from the results
-        3. Any notable patterns or insights
+        Provide a natural, conversational response that:
+        1. Directly answers the user's question
+        2. Highlights the most important findings
+        3. Presents key statistics or metrics clearly
+        4. Identifies patterns, trends, or anomalies
+        5. Offers actionable insights or recommendations when relevant
         
-        Keep the response conversational and helpful.
+        Guidelines:
+        - Be friendly and conversational
+        - Format numbers for easy reading (e.g., 1,234 instead of 1234)
+        - Use percentages and comparisons where helpful
+        - Organize information with bullet points or lists when appropriate
+        - Don't mention SQL, queries, or technical database operations
+        - Focus on the business insights and value
+        - If the data shows concerning patterns, highlight them constructively
         """
         
         return await self.llm_service.generate_response(prompt)
@@ -283,7 +343,8 @@ class AgentOrchestrator:
         connection_id: Optional[str],
         database_context: str,
         existing_data: Optional[Any] = None,
-        intent: Optional[Dict[str, Any]] = None
+        intent: Optional[Dict[str, Any]] = None,
+        selected_tables: Optional[List[str]] = None
     ) -> Dict[str, Any]:
         """Handle data analysis requests using the PandasAgent when possible"""
         
@@ -301,7 +362,12 @@ class AgentOrchestrator:
                         "error": "Missing data source"
                     }
                 # Fetch data from database first
-                sql_query = await self._generate_sql_query(query, database_context)
+                sql_query = await self._generate_sql_query(
+                    query,
+                    database_context,
+                    connection_id=connection_id,
+                    selected_tables=selected_tables,
+                )
                 from app.api.routes.database import execute_query_internal
                 query_result = await execute_query_internal(connection_id, sql_query)
                 if not (query_result.get("success") and query_result.get("data")):
@@ -373,18 +439,24 @@ class AgentOrchestrator:
             prompt = f"""
             User query: {query}
             
-            Data statistics:
+            Dataset Overview:
             {json.dumps(stats, indent=2, default=str)}
             
             Sample data (first 10 rows):
             {df.head(10).to_dict('records')}
             
-            Provide insights and analysis based on this data.
-            Focus on:
-            1. Key patterns and trends
-            2. Notable statistics
-            3. Any anomalies or interesting findings
-            4. Recommendations based on the data
+            Analyze this data and provide a comprehensive response that:
+            1. Directly answers the user's question
+            2. Highlights key patterns and trends
+            3. Presents important statistics clearly
+            4. Identifies any anomalies or outliers
+            5. Offers actionable recommendations
+            
+            Format your response conversationally, using:
+            - Clear headings for different insights
+            - Bullet points for lists
+            - Percentages and comparisons where helpful
+            - Plain language, avoiding technical jargon
             """
             
             return await self.llm_service.generate_response(prompt)
@@ -427,13 +499,17 @@ class AgentOrchestrator:
         prompt = query
         if database_context:
             prompt = f"""
-            Database Context (for reference):
+            Available Database Information:
             {database_context}
             
-            User Query: {query}
+            User Question: {query}
             
-            Please answer the user's question. If it relates to the database, 
-            you can reference the available tables and suggest SQL queries they could run.
+            Provide a helpful, conversational response. If the question relates to the database:
+            - Explain what data is available
+            - Suggest insights that could be obtained
+            - Offer to help with specific analysis
+            
+            Be friendly, clear, and focus on helping the user understand their options.
             """
         
         return await self.llm_service.generate_response(prompt)
@@ -452,25 +528,21 @@ class AgentOrchestrator:
             prompt = f"""
             {context_info}
             
-            Analyze the following query and determine:
-            1. Type: sql_query, data_analysis, report_generation, or general
-            2. If visualization is needed
-            3. Suggested chart type if applicable
+            Classify the user's request so we can respond appropriately.
+            Determine:
+            1. type: one of [sql_query, data_analysis, report_generation, general]
+            2. needs_visualization: whether a chart would help communicate the result
+            3. chart_type: if visualization is needed, suggest one of [bar, line, scatter, pie, heatmap, auto]
             
             Query: {query}
             
-            Rules for classification:
-            - sql_query: User wants to query the database or asks about specific data
-            - data_analysis: User wants statistical analysis or insights from data
-            - report_generation: User wants a formatted report or document
-            - general: General questions or no database operation needed
+            Classification rules:
+            - sql_query: The user wants specific data from the database
+            - data_analysis: The user wants insights, statistics, or trends from a dataset
+            - report_generation: The user wants a formatted document or multi-section summary
+            - general: Everything else that does not require database operations
             
-            Return as JSON:
-            {{
-                "type": "...",
-                "needs_visualization": true/false,
-                "chart_type": "bar/line/scatter/pie/auto"
-            }}
+            Return a compact JSON object with exactly these keys and booleans as true/false.
             """
             
             response = await self.llm_service.generate_response(

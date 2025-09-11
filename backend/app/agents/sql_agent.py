@@ -83,12 +83,13 @@ class SQLAgent:
             enhanced_query = f"""
             {natural_language_query}
             
-            Please provide:
-            1. The SQL query you're executing
-            2. The results in a structured format
-            3. A brief explanation of the results
-            
-            If the query returns numerical data, include basic statistics.
+            Important: In your response, focus on answering the user's question directly.
+            - Present the data findings clearly
+            - Highlight key insights and patterns
+            - Format numbers for readability
+            - Don't explain the SQL operations or technical details
+            - Be conversational and helpful
+            - If relevant, provide recommendations based on the data
             """
             
             # Execute through agent

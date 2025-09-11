@@ -5,7 +5,7 @@ import FullscreenIcon from '@mui/icons-material/Fullscreen';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import CloseIcon from '@mui/icons-material/Close';
 import Plot from 'react-plotly.js';
-import Plotly from 'plotly.js';
+import Plotly from 'plotly.js-dist-min';
 
 interface ChartDisplayProps {
   chartData: {
@@ -19,12 +19,26 @@ const ChartDisplay: React.FC<ChartDisplayProps> = ({ chartData }) => {
   const chartRef = useRef<any>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
+  
+  // Debug logging
+  console.log('ChartDisplay received chartData:', chartData);
 
   const parsedData = useMemo(() => {
     try {
-      return JSON.parse(chartData.data);
+      // Check if data is already an object or needs parsing
+      if (typeof chartData.data === 'string') {
+        const parsed = JSON.parse(chartData.data);
+        console.log('Parsed chart data:', parsed);
+        return parsed;
+      } else if (typeof chartData.data === 'object' && chartData.data !== null) {
+        console.log('Chart data is already an object:', chartData.data);
+        return chartData.data;
+      } else {
+        console.error('Invalid chart data format:', chartData.data);
+        return null;
+      }
     } catch (error) {
-      console.error('Error parsing chart data:', error);
+      console.error('Error parsing chart data:', error, 'Data:', chartData.data);
       return null;
     }
   }, [chartData.data]);
@@ -81,18 +95,27 @@ const ChartDisplay: React.FC<ChartDisplayProps> = ({ chartData }) => {
       </Box>
 
       <Box sx={{ width: '100%', height: 400 }}>
-        <Plot
-          key={refreshKey}
-          ref={chartRef}
-          data={parsedData.data || []}
-          layout={{
-            ...parsedData.layout,
-            autosize: true,
-            margin: { t: 30, r: 30, b: 50, l: 50 },
-          }}
-          config={chartData.config || { responsive: true }}
-          style={{ width: '100%', height: '100%' }}
-        />
+        {parsedData && parsedData.data ? (
+          <Plot
+            key={refreshKey}
+            ref={chartRef}
+            data={parsedData.data || []}
+            layout={{
+              ...parsedData.layout,
+              autosize: true,
+              margin: { t: 30, r: 30, b: 50, l: 50 },
+            }}
+            config={chartData.config || { responsive: true }}
+            style={{ width: '100%', height: '100%' }}
+            onInitialized={() => console.log('Plot initialized')}
+            onUpdate={() => console.log('Plot updated')}
+            onError={(error) => console.error('Plot error:', error)}
+          />
+        ) : (
+          <Typography color="text.secondary" align="center" sx={{ pt: 10 }}>
+            No chart data available
+          </Typography>
+        )}
       </Box>
 
       {/* Fullscreen dialog */}

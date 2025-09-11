@@ -78,6 +78,9 @@ docker-compose logs -f
 
 # Stop services
 docker-compose down
+
+# Rebuild and Rerun
+docker-compose down && docker-compose up --build -d
 ```
 
 ### 4. Manual Installation

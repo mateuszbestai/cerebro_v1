@@ -50,13 +50,20 @@ class PandasAgent:
             enhanced_query = f"""
             {query}
             
-            Please provide:
-            1. The pandas operations you're performing
-            2. The results in a clear format
-            3. Key insights from the analysis
-            4. Any relevant statistics or patterns
+            Analyze the data and provide:
+            1. Direct answer to the question
+            2. Key insights and findings
+            3. Relevant statistics (formatted clearly)
+            4. Patterns or trends discovered
+            5. Recommendations based on the analysis
             
-            Format numerical results with appropriate precision.
+            Important guidelines:
+            - Be conversational and clear
+            - Format numbers with appropriate precision (e.g., 1,234.56 or 12.3%)
+            - Focus on insights, not technical details
+            - Don't describe the pandas operations or code used
+            - Present findings as natural language insights
+            - Use bullet points or numbered lists for clarity when appropriate
             """
             
             # Execute analysis

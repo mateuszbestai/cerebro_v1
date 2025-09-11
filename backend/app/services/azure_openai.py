@@ -19,6 +19,16 @@ class AzureOpenAIService:
             temperature=0.7,
             max_tokens=4000
         )
+        
+        # Default system prompt for clean responses
+        self.default_system_prompt = """
+        You are a professional data analyst assistant. Your responses should be:
+        - Clear and conversational
+        - Focused on insights and value
+        - Free from technical jargon
+        - Well-formatted with bullet points and lists where appropriate
+        - Never mention the tools or processes you use internally
+        """
     
     def get_llm(self):
         """Get the LLM instance for use in agents"""
@@ -34,8 +44,9 @@ class AzureOpenAIService:
         
         messages = []
         
-        if system_prompt:
-            messages.append(SystemMessage(content=system_prompt))
+        # Use provided system prompt or default to clean responses
+        effective_system_prompt = system_prompt if system_prompt else self.default_system_prompt
+        messages.append(SystemMessage(content=effective_system_prompt))
         
         messages.append(HumanMessage(content=prompt))
         
@@ -60,11 +71,18 @@ class AzureOpenAIService:
         """Generate summary of data or results"""
         
         prompt = f"""
-        Please provide a concise summary of the following data/results.
-        Focus on key insights and patterns.
-        Maximum length: {max_length} words.
+        Analyze the following data and provide a clear, insightful summary.
         
-        Data: {data}
+        Requirements:
+        - Maximum {max_length} words
+        - Focus on the most important findings
+        - Use bullet points for key insights
+        - Include relevant statistics and percentages
+        - Suggest actionable next steps if applicable
+        - Write in a conversational, business-friendly tone
+        
+        Data to summarize:
+        {data}
         """
         
         return await self.generate_response(prompt)
