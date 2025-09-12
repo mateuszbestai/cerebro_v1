@@ -13,7 +13,6 @@ import {
 } from '@mui/material';
 import {
   Chat as ChatIcon,
-  Assessment as AssessmentIcon,
   Description as ReportIcon,
   Storage as DatabaseIcon,
   Timeline as TimelineIcon,
@@ -34,7 +33,6 @@ const Sidebar: React.FC<SidebarProps> = ({ open, onClose, variant = 'permanent' 
 
   const menuItems = [
     { text: 'Chat', icon: <ChatIcon />, path: '/' },
-    { text: 'Analysis', icon: <AssessmentIcon />, path: '/analysis' },
     { text: 'Reports', icon: <ReportIcon />, path: '/reports' },
     { text: 'Database', icon: <DatabaseIcon />, path: '/database' },
     { text: 'Visualizations', icon: <TimelineIcon />, path: '/visualizations' },

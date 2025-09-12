@@ -11,21 +11,36 @@ import {
   CardContent,
   IconButton,
   Tooltip,
+  List,
+  ListItemText,
+  ListItemButton,
+  Divider,
+  Chip,
+  Button,
 } from '@mui/material';
 import {
   Download as DownloadIcon,
-  Share as ShareIcon,
-  Refresh as RefreshIcon,
-  SaveAlt as SaveIcon,
+  History as HistoryIcon,
+  NavigateBefore as PrevIcon,
+  NavigateNext as NextIcon,
+  Clear as ClearIcon,
+  Send as SendIcon,
 } from '@mui/icons-material';
 import ChartDisplay from './ChartDisplay';
+import MultipleChartsDisplay from './MultipleChartsDisplay';
 import DataTable from './DataTable';
-import { useAnalysis } from '../../hooks/useAnalysis';
+import { useDispatch, useSelector } from 'react-redux';
+import { RootState } from '../../store';
+import { navigateHistory, selectFromHistory, clearHistory } from '../../store/analysisSlice';
 import LoadingSpinner from '../Common/LoadingSpinner';
 
 const AnalysisResults: React.FC = () => {
-  const { currentResult, isAnalyzing, runAnalysis } = useAnalysis();
+  const dispatch = useDispatch();
+  const { history, currentResult, currentHistoryIndex, isAnalyzing } = useSelector(
+    (state: RootState) => state.analysis
+  );
   const [activeTab, setActiveTab] = useState(0);
+  const [showHistory, setShowHistory] = useState(true);
 
   const handleTabChange = (_event: React.SyntheticEvent, newValue: number) => {
     setActiveTab(newValue);
@@ -36,26 +51,44 @@ const AnalysisResults: React.FC = () => {
     console.log('Exporting results...');
   };
 
-  const handleRefresh = () => {
-    if (currentResult?.query) {
-      runAnalysis(currentResult.query);
-    }
+  const handleNavigateHistory = (direction: 'prev' | 'next') => {
+    dispatch(navigateHistory(direction));
+  };
+
+  const handleSelectFromHistory = (index: number) => {
+    dispatch(selectFromHistory(index));
+    setShowHistory(false);
+  };
+
+  const handleClearHistory = () => {
+    dispatch(clearHistory());
   };
 
   if (isAnalyzing) {
     return <LoadingSpinner message="Analyzing data..." fullScreen />;
   }
 
-  if (!currentResult) {
+  if (!currentResult && history.length === 0) {
     return (
       <Container>
         <Box sx={{ textAlign: 'center', py: 8 }}>
+          <HistoryIcon sx={{ fontSize: 60, color: 'text.secondary', mb: 2 }} />
           <Typography variant="h5" color="text.secondary">
-            No analysis results available
+            No Analysis History
           </Typography>
           <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
-            Start by asking a question in the chat interface
+            Your analysis results from the chat interface will appear here.
+            <br />
+            You can navigate through previous analyses and compare results.
           </Typography>
+          <Button
+            variant="contained"
+            startIcon={<SendIcon />}
+            href="/"
+            sx={{ mt: 3 }}
+          >
+            Start Analysis in Chat
+          </Button>
         </Box>
       </Container>
     );
@@ -63,38 +96,120 @@ const AnalysisResults: React.FC = () => {
 
   return (
     <Container maxWidth="xl">
-      <Box sx={{ mb: 3 }}>
-        <Grid container justifyContent="space-between" alignItems="center">
-          <Grid item>
-            <Typography variant="h4">Analysis Results</Typography>
-            <Typography variant="subtitle1" color="text.secondary">
-              {currentResult.query}
-            </Typography>
-          </Grid>
-          <Grid item>
-            <Tooltip title="Refresh">
-              <IconButton onClick={handleRefresh}>
-                <RefreshIcon />
-              </IconButton>
-            </Tooltip>
-            <Tooltip title="Export">
-              <IconButton onClick={handleExport}>
-                <DownloadIcon />
-              </IconButton>
-            </Tooltip>
-            <Tooltip title="Share">
-              <IconButton>
-                <ShareIcon />
-              </IconButton>
-            </Tooltip>
-            <Tooltip title="Save">
-              <IconButton>
-                <SaveIcon />
-              </IconButton>
-            </Tooltip>
-          </Grid>
-        </Grid>
-      </Box>
+      <Box sx={{ display: 'flex', gap: 2, height: 'calc(100vh - 150px)' }}>
+        {/* History Sidebar */}
+        {showHistory && history.length > 0 && (
+          <Paper
+            elevation={2}
+            sx={{
+              width: 300,
+              display: 'flex',
+              flexDirection: 'column',
+              overflow: 'hidden',
+            }}
+          >
+            <Box sx={{ p: 2, borderBottom: 1, borderColor: 'divider' }}>
+              <Typography variant="h6">Analysis History</Typography>
+              <Typography variant="caption" color="text.secondary">
+                {history.length} analyses
+              </Typography>
+            </Box>
+            <List sx={{ flex: 1, overflow: 'auto' }}>
+              {history.map((item, index) => (
+                <React.Fragment key={index}>
+                  <ListItemButton
+                    selected={index === currentHistoryIndex}
+                    onClick={() => handleSelectFromHistory(index)}
+                  >
+                    <ListItemText
+                      primary={
+                        <Typography variant="body2" noWrap>
+                          {item.query}
+                        </Typography>
+                      }
+                      secondary={
+                        <Box>
+                          <Typography variant="caption" color="text.secondary">
+                            {new Date(item.timestamp || '').toLocaleString()}
+                          </Typography>
+                          {item.intent && (
+                            <Chip
+                              label={item.intent.type}
+                              size="small"
+                              sx={{ ml: 1, height: 16 }}
+                            />
+                          )}
+                        </Box>
+                      }
+                    />
+                  </ListItemButton>
+                  {index < history.length - 1 && <Divider />}
+                </React.Fragment>
+              ))}
+            </List>
+            <Box sx={{ p: 1, borderTop: 1, borderColor: 'divider' }}>
+              <Button
+                fullWidth
+                size="small"
+                startIcon={<ClearIcon />}
+                onClick={handleClearHistory}
+                color="error"
+              >
+                Clear History
+              </Button>
+            </Box>
+          </Paper>
+        )}
+
+        {/* Main Content */}
+        <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+          {currentResult && (
+            <>
+              <Paper elevation={2} sx={{ p: 2, mb: 2 }}>
+                <Grid container justifyContent="space-between" alignItems="center">
+                  <Grid item xs>
+                    <Typography variant="h5">Analysis Results</Typography>
+                    <Typography variant="subtitle1" color="text.secondary">
+                      {currentResult.query}
+                    </Typography>
+                  </Grid>
+                  <Grid item>
+                    <Box sx={{ display: 'flex', gap: 1 }}>
+                      <Tooltip title="Previous">
+                        <IconButton
+                          onClick={() => handleNavigateHistory('prev')}
+                          disabled={currentHistoryIndex >= history.length - 1}
+                        >
+                          <PrevIcon />
+                        </IconButton>
+                      </Tooltip>
+                      <Chip
+                        label={`${currentHistoryIndex + 1} / ${history.length}`}
+                        sx={{ alignSelf: 'center' }}
+                      />
+                      <Tooltip title="Next">
+                        <IconButton
+                          onClick={() => handleNavigateHistory('next')}
+                          disabled={currentHistoryIndex <= 0}
+                        >
+                          <NextIcon />
+                        </IconButton>
+                      </Tooltip>
+                      <Divider orientation="vertical" flexItem sx={{ mx: 1 }} />
+                      <Tooltip title="Toggle History">
+                        <IconButton onClick={() => setShowHistory(!showHistory)}>
+                          <HistoryIcon color={showHistory ? 'primary' : 'action'} />
+                        </IconButton>
+                      </Tooltip>
+                      <Tooltip title="Export">
+                        <IconButton onClick={handleExport}>
+                          <DownloadIcon />
+                        </IconButton>
+                      </Tooltip>
+                    </Box>
+                  </Grid>
+                </Grid>
+              </Paper>
 
       <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 3 }}>
         <Tabs value={activeTab} onChange={handleTabChange}>
@@ -151,8 +266,21 @@ const AnalysisResults: React.FC = () => {
         </Paper>
       )}
 
-      {activeTab === 2 && currentResult.visualization && (
-        <ChartDisplay chartData={currentResult.visualization} />
+      {activeTab === 2 && (
+        <>
+          {currentResult.visualizations && currentResult.visualizations.length > 0 ? (
+            <MultipleChartsDisplay
+              charts={currentResult.visualizations}
+              query={currentResult.query}
+            />
+          ) : currentResult.visualization ? (
+            <ChartDisplay chartData={currentResult.visualization} />
+          ) : (
+            <Typography variant="body2" color="text.secondary">
+              No visualizations available
+            </Typography>
+          )}
+        </>
       )}
 
       {activeTab === 3 && (
@@ -165,6 +293,10 @@ const AnalysisResults: React.FC = () => {
           </Typography>
         </Paper>
       )}
+            </>
+          )}
+        </Box>
+      </Box>
     </Container>
   );
 };

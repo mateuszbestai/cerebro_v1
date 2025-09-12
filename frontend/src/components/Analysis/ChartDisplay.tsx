@@ -12,6 +12,7 @@ interface ChartDisplayProps {
     type: string;
     data: string; // JSON string from backend
     config?: any;
+    title?: string; // optional human/AI supplied title
   };
 }
 
@@ -20,28 +21,27 @@ const ChartDisplay: React.FC<ChartDisplayProps> = ({ chartData }) => {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
   
-  // Debug logging
-  console.log('ChartDisplay received chartData:', chartData);
-
   const parsedData = useMemo(() => {
     try {
-      // Check if data is already an object or needs parsing
       if (typeof chartData.data === 'string') {
-        const parsed = JSON.parse(chartData.data);
-        console.log('Parsed chart data:', parsed);
-        return parsed;
+        return JSON.parse(chartData.data);
       } else if (typeof chartData.data === 'object' && chartData.data !== null) {
-        console.log('Chart data is already an object:', chartData.data);
         return chartData.data;
-      } else {
-        console.error('Invalid chart data format:', chartData.data);
-        return null;
       }
+      return null;
     } catch (error) {
       console.error('Error parsing chart data:', error, 'Data:', chartData.data);
       return null;
     }
   }, [chartData.data]);
+
+  const resolvedTitle = useMemo(() => {
+    if (chartData.title) return chartData.title;
+    const layoutTitle = (parsedData?.layout?.title as any) || undefined;
+    if (!layoutTitle) return 'Data Visualization';
+    // Plotly may store title as string or { text: string }
+    return typeof layoutTitle === 'string' ? layoutTitle : layoutTitle.text || 'Data Visualization';
+  }, [chartData.title, parsedData]);
 
   if (!parsedData) {
     return (
@@ -67,22 +67,18 @@ const ChartDisplay: React.FC<ChartDisplayProps> = ({ chartData }) => {
     }
   };
 
-  const handleFullscreen = () => {
-    setIsFullscreen(true);
-  };
-
   return (
     <Paper elevation={2} sx={{ p: 2, position: 'relative' }}>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
-        <Typography variant="h6">Data Visualization</Typography>
+        <Typography variant="h6">{resolvedTitle}</Typography>
         <Box>
-        <Tooltip title="Refresh">
+          <Tooltip title="Refresh">
             <IconButton size="small" onClick={() => setRefreshKey((k) => k + 1)}>
               <RefreshIcon />
             </IconButton>
           </Tooltip>
           <Tooltip title="Fullscreen">
-            <IconButton size="small" onClick={handleFullscreen}>
+            <IconButton size="small" onClick={() => setIsFullscreen(true)}>
               <FullscreenIcon />
             </IconButton>
           </Tooltip>
@@ -121,7 +117,7 @@ const ChartDisplay: React.FC<ChartDisplayProps> = ({ chartData }) => {
       {/* Fullscreen dialog */}
       <Dialog open={isFullscreen} onClose={() => setIsFullscreen(false)} fullWidth maxWidth="xl">
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', p: 1, pl: 2 }}>
-          <Typography variant="subtitle1">Fullscreen Chart</Typography>
+          <Typography variant="subtitle1">{resolvedTitle}</Typography>
           <IconButton size="small" onClick={() => setIsFullscreen(false)}>
             <CloseIcon />
           </IconButton>

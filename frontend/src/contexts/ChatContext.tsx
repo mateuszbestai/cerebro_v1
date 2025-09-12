@@ -2,6 +2,8 @@ import React, { createContext, useContext, useState, useCallback, useRef } from 
 import { apiClient } from '../services/api';
 import { useDatabase } from '../contexts/DatabaseContext';
 import { Message } from '../types';
+import { useDispatch } from 'react-redux';
+import { addResult } from '../store/analysisSlice';
 
 interface ChatContextType {
   // State
@@ -43,6 +45,7 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
   const [currentAnalysis, setCurrentAnalysis] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
   const [isConnected, setIsConnected] = useState(false);
+  const dispatch = useDispatch();
   
   const abortControllerRef = useRef<AbortController | null>(null);
   const wsConnectionRef = useRef<WebSocket | null>(null);
@@ -54,7 +57,8 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
     getTableContext, 
     executeQuery,
     selectedTables,
-    databaseInfo 
+    databaseInfo,
+    tables,
   } = useDatabase();
 
   const sendMessage = useCallback(async (content: string) => {
@@ -96,6 +100,8 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
         context.database_context = getTableContext();
         context.selected_tables = selectedTables;
         context.database_name = databaseInfo?.database_name;
+        context.tables_count = tables.length;
+        context.all_table_names = tables.map(t => t.name);
         
         // Detect query intent
         const lowerContent = content.toLowerCase();
@@ -159,6 +165,25 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
       // Update current analysis
       if (enrichedAnalysis) {
         setCurrentAnalysis(enrichedAnalysis);
+        // Push into analysis history for the AnalysisResults and persistence
+        try {
+          dispatch(addResult({
+            query: content,
+            intent: enrichedAnalysis.intent || { type: 'general' },
+            response: response.response,
+            data: enrichedAnalysis.data,
+            visualization: enrichedAnalysis.visualization,
+            visualizations: enrichedAnalysis.visualizations,
+            sql_query: enrichedAnalysis.sql_query,
+            columns: enrichedAnalysis.columns,
+            row_count: enrichedAnalysis.row_count,
+            report: enrichedAnalysis.report,
+            statistics: enrichedAnalysis.statistics,
+            timestamp: new Date().toISOString(),
+          }));
+        } catch (e) {
+          console.warn('Failed to add analysis result to history:', e);
+        }
       }
       
     } catch (error: any) {

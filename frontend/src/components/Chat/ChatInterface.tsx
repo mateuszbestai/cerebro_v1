@@ -13,6 +13,7 @@ import {
   IconButton,
   Tooltip,
   Badge,
+  Dialog,
 } from '@mui/material';
 import {
   Storage as DatabaseIcon,
@@ -21,13 +22,17 @@ import {
   ExpandLess as ExpandLessIcon,
   Refresh as RefreshIcon,
   Warning as WarningIcon,
+  History as HistoryIcon,
 } from '@mui/icons-material';
 import { useChat } from '../../contexts/ChatContext';
 import { useDatabase } from '../../contexts/DatabaseContext';
 import MessageList from './MessageList';
 import MessageInput from './MessageInput';
 import ChartDisplay from '../Analysis/ChartDisplay';
+import MultipleChartsDisplay from '../Analysis/MultipleChartsDisplay';
 import DataTable from '../Analysis/DataTable';
+import { useSelector } from 'react-redux';
+import { RootState } from '../../store';
 
 const ChatInterface: React.FC = () => {
   const { messages, isLoading, sendMessage, currentAnalysis } = useChat();
@@ -42,6 +47,8 @@ const ChatInterface: React.FC = () => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [showDatabaseContext, setShowDatabaseContext] = useState(false);
   const [showAnalysisPanel, setShowAnalysisPanel] = useState(true);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const history = useSelector((state: RootState) => state.analysis.history);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -243,6 +250,11 @@ const ChatInterface: React.FC = () => {
               <Box display="flex" alignItems="center" justifyContent="space-between">
                 <Typography variant="h6">Analysis Results</Typography>
                 <Box display="flex" gap={1}>
+                  <Tooltip title="History">
+                    <IconButton size="small" onClick={() => setHistoryOpen(true)}>
+                      <HistoryIcon />
+                    </IconButton>
+                  </Tooltip>
                   <Tooltip title="Refresh">
                     <IconButton size="small">
                       <RefreshIcon />
@@ -283,9 +295,20 @@ const ChatInterface: React.FC = () => {
             </Box>
 
             <Box sx={{ flex: 1, overflow: 'auto', p: 2 }}>
-              {/* Visualization */}
-              {currentAnalysis.visualization && (
+              {/* Multiple Visualizations */}
+              {currentAnalysis.visualizations && currentAnalysis.visualizations.length > 0 && (
                 <Box sx={{ mb: 2 }}>
+                  <MultipleChartsDisplay 
+                    charts={currentAnalysis.visualizations} 
+                    query={currentAnalysis.query}
+                  />
+                </Box>
+              )}
+              
+              {/* Single Visualization (fallback for backward compatibility) */}
+              {!currentAnalysis.visualizations && currentAnalysis.visualization && (
+                <Box sx={{ mb: 2 }}>
+                  {/* Single chart with quick action to save to dashboard */}
                   <ChartDisplay chartData={currentAnalysis.visualization} />
                 </Box>
               )}
@@ -296,7 +319,7 @@ const ChatInterface: React.FC = () => {
                   <Typography variant="subtitle2" gutterBottom>
                     Query Results ({currentAnalysis.row_count || currentAnalysis.data.length} rows)
                   </Typography>
-                  <DataTable data={currentAnalysis.data} />
+                  <DataTable data={currentAnalysis.data} title={currentAnalysis.query || 'Query Results'} />
                 </Box>
               )}
 
@@ -366,6 +389,38 @@ const ChatInterface: React.FC = () => {
           </Box>
         </Box>
       )}
+      {/* History Dialog */}
+      <Dialog open={historyOpen} onClose={() => setHistoryOpen(false)} maxWidth="lg" fullWidth>
+        <Box sx={{ p: 2 }}>
+          <Typography variant="h6" gutterBottom>
+            Analysis History
+          </Typography>
+          {history.length === 0 ? (
+            <Typography color="text.secondary">No history yet.</Typography>
+          ) : (
+            <Box sx={{ maxHeight: '70vh', overflow: 'auto' }}>
+              {history.map((item, idx) => (
+                <Paper key={idx} sx={{ p: 2, mb: 2 }} variant="outlined">
+                  <Typography variant="subtitle1" gutterBottom>
+                    {item.query}
+                  </Typography>
+                  {item.visualizations && item.visualizations.length > 0 && (
+                    <MultipleChartsDisplay charts={item.visualizations} query={item.query} />
+                  )}
+                  {!item.visualizations && item.visualization && (
+                    <ChartDisplay chartData={item.visualization} />
+                  )}
+                  {item.data && (
+                    <Box sx={{ mt: 2 }}>
+                      <DataTable data={item.data} title={item.query || 'Results'} />
+                    </Box>
+                  )}
+                </Paper>
+              ))}
+            </Box>
+          )}
+        </Box>
+      </Dialog>
     </Container>
   );
 };

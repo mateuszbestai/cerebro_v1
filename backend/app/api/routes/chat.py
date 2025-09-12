@@ -97,8 +97,12 @@ async def send_message(chat_message: ChatMessage):
             analysis={
                 "data": result.get("data"),
                 "visualization": result.get("visualization"),
+                "visualizations": result.get("visualizations"),
                 "report": result.get("report"),
-                "intent": result.get("intent")
+                "intent": result.get("intent"),
+                "sql_query": result.get("sql_query"),
+                "columns": result.get("columns"),
+                "row_count": result.get("row_count")
             }
         )
         

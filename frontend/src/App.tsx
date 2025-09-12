@@ -8,11 +8,11 @@ import { store } from './store';
 // Components
 import Layout from './components/Common/Layout';
 import ChatInterface from './components/Chat/ChatInterface';
-import AnalysisResults from './components/Analysis/AnalysisResults';
 import ReportViewer from './components/Reports/ReportViewer';
 import ConnectionDialog from './components/Database/ConnectionDialog';
 import TablesDashboard from './components/Database/TablesDashboard';
 import DatabaseStatus from './components/Database/DatabaseStatus.tsx';
+import VisualizationsDashboard from './components/Visualizations/VisualizationsDashboard';
 
 // Contexts
 import { DatabaseProvider } from './contexts/DatabaseContext';
@@ -70,9 +70,8 @@ function AppContent() {
       <Routes>
         <Route path="/" element={<ChatInterface />} />
         <Route path="/database" element={<TablesDashboard />} />
-        <Route path="/analysis" element={<AnalysisResults />} />
         <Route path="/reports" element={<ReportViewer />} />
-        <Route path="/visualizations" element={<div>Visualizations Page</div>} />
+        <Route path="/visualizations" element={<VisualizationsDashboard />} />
         <Route path="/settings" element={<div>Settings Page</div>} />
         <Route path="/help" element={<div>Help Page</div>} />
         <Route path="*" element={<Navigate to="/" replace />} />

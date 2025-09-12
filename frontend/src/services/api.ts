@@ -17,11 +17,13 @@ interface ChatResponse {
   analysis?: {
     data?: any[];
     visualization?: any;
+    visualizations?: any[]; // multiple charts
     report?: any;
     intent?: any;
     sql_query?: string;
     columns?: string[];
     row_count?: number;
+    statistics?: Record<string, any>;
     error?: string;
   };
   error?: string;

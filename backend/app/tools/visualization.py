@@ -56,6 +56,171 @@ class VisualizationTool:
             logger.error(f"Error creating chart: {str(e)}")
             raise
     
+    async def create_multiple_charts(
+        self,
+        data: Any,
+        analysis_type: str = "comprehensive",
+        config: Optional[Dict] = None
+    ) -> List[Dict[str, Any]]:
+        """
+        Create multiple charts for comprehensive data analysis
+        """
+        try:
+            df = self._prepare_dataframe(data)
+            charts = []
+            
+            # Determine which charts to create based on data characteristics
+            numeric_cols = df.select_dtypes(include=['number']).columns.tolist()
+            categorical_cols = df.select_dtypes(include=['object', 'category']).columns.tolist()
+            
+            if analysis_type == "comprehensive" or analysis_type == "auto":
+                # Create multiple relevant charts based on data
+                
+                # 1. Distribution charts for numeric columns
+                if len(numeric_cols) > 0:
+                    # Histogram for first numeric column
+                    for col in numeric_cols[:3]:  # Limit to first 3 numeric columns
+                        try:
+                            hist_fig = px.histogram(
+                                df, x=col, 
+                                title=f"Distribution of {col}",
+                                nbins=30
+                            )
+                            hist_fig.update_layout(**self.default_layout)
+                            charts.append({
+                                "type": "histogram",
+                                "title": f"Distribution of {col}",
+                                "data": hist_fig.to_json(),
+                                "config": self._get_chart_config()
+                            })
+                        except Exception as e:
+                            logger.debug(f"Could not create histogram for {col}: {e}")
+                
+                # 2. Correlation heatmap if multiple numeric columns
+                if len(numeric_cols) >= 2:
+                    try:
+                        corr_matrix = df[numeric_cols].corr()
+                        heatmap_fig = px.imshow(
+                            corr_matrix,
+                            title="Correlation Heatmap",
+                            color_continuous_scale="RdBu",
+                            aspect="auto"
+                        )
+                        heatmap_fig.update_layout(**self.default_layout)
+                        charts.append({
+                            "type": "heatmap",
+                            "title": "Correlation Heatmap",
+                            "data": heatmap_fig.to_json(),
+                            "config": self._get_chart_config()
+                        })
+                    except Exception as e:
+                        logger.debug(f"Could not create correlation heatmap: {e}")
+                
+                # 3. Bar charts for categorical vs numeric
+                if len(categorical_cols) > 0 and len(numeric_cols) > 0:
+                    cat_col = categorical_cols[0]
+                    num_col = numeric_cols[0]
+                    
+                    # Check if categorical column has reasonable number of unique values
+                    if df[cat_col].nunique() <= 20:
+                        try:
+                            # Aggregated bar chart
+                            agg_df = df.groupby(cat_col)[num_col].mean().reset_index()
+                            bar_fig = px.bar(
+                                agg_df, x=cat_col, y=num_col,
+                                title=f"Average {num_col} by {cat_col}"
+                            )
+                            bar_fig.update_layout(**self.default_layout)
+                            charts.append({
+                                "type": "bar",
+                                "title": f"Average {num_col} by {cat_col}",
+                                "data": bar_fig.to_json(),
+                                "config": self._get_chart_config()
+                            })
+                        except Exception as e:
+                            logger.debug(f"Could not create bar chart: {e}")
+                
+                # 4. Time series if date column detected
+                date_cols = df.select_dtypes(include=['datetime64']).columns.tolist()
+                if not date_cols:
+                    # Try to detect date columns by name
+                    potential_date_cols = [col for col in df.columns if 
+                                          any(date_word in col.lower() for date_word in 
+                                          ['date', 'time', 'created', 'updated', 'timestamp'])]
+                    for col in potential_date_cols:
+                        try:
+                            df[col] = pd.to_datetime(df[col])
+                            date_cols.append(col)
+                        except:
+                            pass
+                
+                if date_cols and len(numeric_cols) > 0:
+                    date_col = date_cols[0]
+                    for num_col in numeric_cols[:2]:  # Limit to 2 time series
+                        try:
+                            line_fig = px.line(
+                                df.sort_values(date_col),
+                                x=date_col, y=num_col,
+                                title=f"{num_col} Over Time"
+                            )
+                            line_fig.update_layout(**self.default_layout)
+                            charts.append({
+                                "type": "line",
+                                "title": f"{num_col} Over Time",
+                                "data": line_fig.to_json(),
+                                "config": self._get_chart_config()
+                            })
+                        except Exception as e:
+                            logger.debug(f"Could not create time series: {e}")
+                
+                # 5. Scatter plot for numeric relationships
+                if len(numeric_cols) >= 2:
+                    try:
+                        scatter_fig = px.scatter(
+                            df, x=numeric_cols[0], y=numeric_cols[1],
+                            title=f"{numeric_cols[1]} vs {numeric_cols[0]}",
+                            trendline="ols" if len(df) > 10 else None
+                        )
+                        scatter_fig.update_layout(**self.default_layout)
+                        charts.append({
+                            "type": "scatter",
+                            "title": f"{numeric_cols[1]} vs {numeric_cols[0]}",
+                            "data": scatter_fig.to_json(),
+                            "config": self._get_chart_config()
+                        })
+                    except Exception as e:
+                        logger.debug(f"Could not create scatter plot: {e}")
+            
+            # If no charts were created, create at least one default chart
+            if not charts:
+                default_chart = await self.create_chart(data, "auto", config)
+                default_chart["title"] = "Data Overview"
+                charts.append(default_chart)
+            
+            return charts
+            
+        except Exception as e:
+            logger.error(f"Error creating multiple charts: {str(e)}")
+            # Return single chart as fallback
+            default_chart = await self.create_chart(data, "auto", config)
+            default_chart["title"] = "Data Overview"
+            return [default_chart]
+    
+    def _get_chart_config(self) -> Dict[str, Any]:
+        """Get default chart configuration"""
+        return {
+            "responsive": True,
+            "displayModeBar": True,
+            "displaylogo": False,
+            "toImageButtonOptions": {
+                "format": "png",
+                "filename": "chart",
+                "height": 500,
+                "width": 700,
+                "scale": 1
+            }
+        }
+    
     def _prepare_dataframe(self, data: Any) -> pd.DataFrame:
         """Convert data to DataFrame for visualization"""
         

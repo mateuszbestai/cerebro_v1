@@ -13,19 +13,25 @@ import {
   IconButton,
   Tooltip,
   TableSortLabel,
+  Button,
 } from '@mui/material';
 import {
   FilterList as FilterIcon,
   Download as DownloadIcon,
+  Dashboard as DashboardIcon,
 } from '@mui/icons-material';
+import { useDispatch } from 'react-redux';
+import { addChart } from '../../store/dashboardSlice';
 
 interface DataTableProps {
   data: any[];
+  title?: string;
 }
 
 type Order = 'asc' | 'desc';
 
-const DataTable: React.FC<DataTableProps> = ({ data }) => {
+const DataTable: React.FC<DataTableProps> = ({ data, title = 'Data Table' }) => {
+  const dispatch = useDispatch();
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [searchTerm, setSearchTerm] = useState('');
@@ -96,6 +102,33 @@ const DataTable: React.FC<DataTableProps> = ({ data }) => {
     console.log('Filter clicked');
   };
 
+  const handleSendToDashboard = () => {
+    // Build a Plotly table figure JSON from the data
+    const values = columns.map((c) => data.map((row) => row[c] ?? null));
+    const figure = {
+      data: [
+        {
+          type: 'table',
+          header: { values: columns },
+          cells: { values },
+        },
+      ],
+      layout: { title },
+    };
+
+    dispatch(
+      addChart({
+        id: `table_${Date.now()}`,
+        title,
+        data: JSON.stringify(figure),
+        type: 'table',
+        source: 'chat',
+        timestamp: new Date().toISOString(),
+        metadata: { description: 'Saved from chat results' },
+      })
+    );
+  };
+
   return (
     <Box>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
@@ -107,6 +140,17 @@ const DataTable: React.FC<DataTableProps> = ({ data }) => {
           sx={{ width: 300 }}
         />
         <Box>
+          <Tooltip title="Send table to Dashboard">
+            <Button
+              size="small"
+              startIcon={<DashboardIcon />}
+              sx={{ mr: 1 }}
+              onClick={handleSendToDashboard}
+              variant="outlined"
+            >
+              Save to Dashboard
+            </Button>
+          </Tooltip>
           <Tooltip title="Filter">
             <IconButton onClick={handleFilter}>
               <FilterIcon />

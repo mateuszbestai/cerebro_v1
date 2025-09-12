@@ -129,7 +129,7 @@ class DatabaseApi {
     count: number;
   }> {
     const response = await this.axiosInstance.get(`/tables/${connectionId}`, {
-      params: { include_system: includeSystem },
+      params: { include_system: includeSystem, include_row_counts: true },
     });
     return response.data;
   }

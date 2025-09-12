@@ -170,11 +170,19 @@ class AgentOrchestrator:
                 # Generate visualization if needed
                 if intent.get("needs_visualization") and query_result.get("data"):
                     try:
-                        viz = await self.visualization_tool.create_chart(
-                            query_result["data"],
-                            intent.get("chart_type", "auto")
-                        )
-                        result["visualization"] = viz
+                        # Check if AI determined multiple charts are needed
+                        if intent.get("multiple_charts", False):
+                            charts = await self.visualization_tool.create_multiple_charts(
+                                query_result["data"],
+                                analysis_type="comprehensive"
+                            )
+                            result["visualizations"] = charts
+                        else:
+                            viz = await self.visualization_tool.create_chart(
+                                query_result["data"],
+                                intent.get("chart_type", "auto")
+                            )
+                            result["visualization"] = viz
                     except Exception as e:
                         logger.error(f"Error creating visualization: {str(e)}")
                 
@@ -399,11 +407,19 @@ class AgentOrchestrator:
             # Optionally generate visualization
             if (intent or {}).get("needs_visualization") and data_for_analysis:
                 try:
-                    viz = await self.visualization_tool.create_chart(
-                        data_for_analysis,
-                        (intent or {}).get("chart_type", "auto")
-                    )
-                    result["visualization"] = viz
+                    # Check if AI determined multiple charts are needed
+                    if (intent or {}).get("multiple_charts", False):
+                        charts = await self.visualization_tool.create_multiple_charts(
+                            data_for_analysis,
+                            analysis_type="comprehensive"
+                        )
+                        result["visualizations"] = charts
+                    else:
+                        viz = await self.visualization_tool.create_chart(
+                            data_for_analysis,
+                            (intent or {}).get("chart_type", "auto")
+                        )
+                        result["visualization"] = viz
                 except Exception as viz_err:
                     logger.error(f"Error creating visualization for analysis: {viz_err}")
             
@@ -533,6 +549,7 @@ class AgentOrchestrator:
             1. type: one of [sql_query, data_analysis, report_generation, general]
             2. needs_visualization: whether a chart would help communicate the result
             3. chart_type: if visualization is needed, suggest one of [bar, line, scatter, pie, heatmap, auto]
+            4. multiple_charts: whether the query would benefit from multiple different visualizations to show various aspects of the data
             
             Query: {query}
             
@@ -541,6 +558,12 @@ class AgentOrchestrator:
             - data_analysis: The user wants insights, statistics, or trends from a dataset
             - report_generation: The user wants a formatted document or multi-section summary
             - general: Everything else that does not require database operations
+            
+            For multiple_charts, set to true if:
+            - The user asks for comprehensive analysis or multiple perspectives
+            - The query suggests exploring relationships, distributions, and trends together
+            - The data would benefit from showing different chart types (e.g., both distribution and correlation)
+            - The user wants to understand the data from multiple angles
             
             Return a compact JSON object with exactly these keys and booleans as true/false.
             """
@@ -557,5 +580,6 @@ class AgentOrchestrator:
             return {
                 "type": "general",
                 "needs_visualization": False,
-                "chart_type": "auto"
+                "chart_type": "auto",
+                "multiple_charts": False
             }

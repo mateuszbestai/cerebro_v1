@@ -339,8 +339,18 @@ async def get_database_info(connection_id: str) -> DatabaseInfo:
         )
 
 @router.get("/tables/{connection_id}")
-async def get_tables(connection_id: str, include_system: bool = False):
-    """Get list of tables in the database"""
+async def get_tables(
+    connection_id: str,
+    include_system: bool = False,
+    include_row_counts: bool = False,
+):
+    """Get list of tables in the database quickly.
+
+    Performance notes:
+    - Avoids per-table COUNT(*) which can be extremely slow on large tables.
+    - Uses INFORMATION_SCHEMA for column counts in a single query.
+    - If include_row_counts=True, uses sys.partitions for an approximate but fast row count.
+    """
     if connection_id not in active_connections:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -349,40 +359,61 @@ async def get_tables(connection_id: str, include_system: bool = False):
     
     try:
         engine = active_connections[connection_id]["engine"]
-        inspector = inspect(engine)
         
-        # Get all tables
-        tables = []
-        for table_name in inspector.get_table_names():
-            # Skip system tables if requested
-            if not include_system and table_name.startswith('sys'):
-                continue
+        with engine.connect() as conn:
+            # Build base filter for system schemas
+            schema_filter = ""
+            if not include_system:
+                schema_filter = "AND t.TABLE_SCHEMA NOT IN ('sys', 'INFORMATION_SCHEMA')"
             
-            # Get basic table info
-            columns = inspector.get_columns(table_name)
+            # Get tables with column counts (single query)
+            tables_query = text(f"""
+                SELECT 
+                    t.TABLE_SCHEMA AS schema_name,
+                    t.TABLE_NAME   AS table_name,
+                    COUNT(c.COLUMN_NAME) AS columns_count
+                FROM INFORMATION_SCHEMA.TABLES t
+                LEFT JOIN INFORMATION_SCHEMA.COLUMNS c
+                    ON t.TABLE_SCHEMA = c.TABLE_SCHEMA AND t.TABLE_NAME = c.TABLE_NAME
+                WHERE t.TABLE_TYPE = 'BASE TABLE' {schema_filter}
+                GROUP BY t.TABLE_SCHEMA, t.TABLE_NAME
+            """)
+            tables_rows = conn.execute(tables_query).fetchall()
             
-            # Get row count (be careful with large tables)
-            with engine.connect() as conn:
-                count_query = text(f"SELECT COUNT(*) FROM [{table_name}]")
-                try:
-                    row_count = conn.execute(count_query).scalar()
-                except:
-                    row_count = None
+            row_counts_map = {}
+            if include_row_counts:
+                # Fast/approximate row counts using sys.partitions (single query)
+                row_counts_query = text("""
+                    SELECT 
+                        s.name AS schema_name,
+                        t.name AS table_name,
+                        SUM(p.rows) AS row_count
+                    FROM sys.tables t
+                    JOIN sys.schemas s ON t.schema_id = s.schema_id
+                    JOIN sys.partitions p ON t.object_id = p.object_id
+                    WHERE p.index_id IN (0, 1)
+                    GROUP BY s.name, t.name
+                """)
+                for r in conn.execute(row_counts_query).fetchall():
+                    row_counts_map[(r._mapping["schema_name"], r._mapping["table_name"])] = int(r._mapping["row_count"]) if r._mapping["row_count"] is not None else None
             
-            tables.append({
-                "name": table_name,
-                "columns_count": len(columns),
-                "row_count": row_count,
-                "type": "table"
-            })
+            tables = []
+            for r in tables_rows:
+                schema_name = r._mapping["schema_name"]
+                table_name = r._mapping["table_name"]
+                columns_count = int(r._mapping["columns_count"]) if r._mapping["columns_count"] is not None else 0
+                row_count = row_counts_map.get((schema_name, table_name)) if include_row_counts else None
+                
+                # Keep returning just the table name for compatibility with existing UI
+                tables.append({
+                    "name": table_name,
+                    "columns_count": columns_count,
+                    "row_count": row_count,
+                    "type": "table",
+                })
         
-        # Sort by name
-        tables.sort(key=lambda x: x["name"])
-        
-        return {
-            "tables": tables,
-            "count": len(tables)
-        }
+        tables.sort(key=lambda x: x["name"])  # Sort by name
+        return {"tables": tables, "count": len(tables)}
         
     except Exception as e:
         logger.error(f"Error getting tables: {str(e)}")

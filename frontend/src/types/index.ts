@@ -14,16 +14,23 @@ export interface Message {
       type: string;
       needs_visualization?: boolean;
       chart_type?: string;
+      multiple_charts?: boolean;
     };
     response: string;
     data?: any;
     visualization?: ChartData;
+    visualizations?: ChartData[];
+    sql_query?: string;
+    columns?: string[];
+    row_count?: number;
     report?: string;
     statistics?: Record<string, any>;
+    timestamp?: string;
   }
   
   export interface ChartData {
     type: string;
+    title?: string;
     data: string; // JSON string
     config?: any;
   }
@@ -45,7 +52,9 @@ export interface Message {
   
   export interface AnalysisState {
     results: AnalysisResult[];
+    history: AnalysisResult[];
     currentResult?: AnalysisResult;
+    currentHistoryIndex: number;
     isAnalyzing: boolean;
     error?: string;
   }
