@@ -163,3 +163,18 @@ async def download_report(report_id: str):
         report["file_path"],
         filename=f"{report['title']}-{report_id}.pdf"
     )
+
+@router.delete("/{report_id}")
+async def delete_report(report_id: str):
+    '''Delete report metadata and file if exists'''
+    if report_id not in report_store:
+        raise HTTPException(status_code=404, detail="Report not found")
+    report = report_store.pop(report_id)
+    try:
+        import os
+        file_path = report.get("file_path")
+        if file_path and os.path.exists(file_path):
+            os.remove(file_path)
+    except Exception:
+        pass
+    return {"status": "deleted", "report_id": report_id}

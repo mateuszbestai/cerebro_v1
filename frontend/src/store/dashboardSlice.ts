@@ -11,6 +11,8 @@ export interface DashboardChart {
   metadata?: {
     query?: string;
     description?: string;
+    chatSessionId?: string;
+    chatTitle?: string;
   };
 }
 

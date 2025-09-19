@@ -31,6 +31,8 @@ import MessageInput from './MessageInput';
 import ChartDisplay from '../Analysis/ChartDisplay';
 import MultipleChartsDisplay from '../Analysis/MultipleChartsDisplay';
 import DataTable from '../Analysis/DataTable';
+import ChatSessionsControls from './ChatSessionsControls';
+import SingleChartWithActions from '../Analysis/SingleChartWithActions';
 import { useSelector } from 'react-redux';
 import { RootState } from '../../store';
 
@@ -196,6 +198,9 @@ const ChatInterface: React.FC = () => {
                 </Typography>
               </Box>
               
+              {/* Chat sessions controls */}
+              <ChatSessionsControls />
+              
               {currentAnalysis && (
                 <Tooltip title={showAnalysisPanel ? 'Hide Analysis' : 'Show Analysis'}>
                   <IconButton 
@@ -308,8 +313,7 @@ const ChatInterface: React.FC = () => {
               {/* Single Visualization (fallback for backward compatibility) */}
               {!currentAnalysis.visualizations && currentAnalysis.visualization && (
                 <Box sx={{ mb: 2 }}>
-                  {/* Single chart with quick action to save to dashboard */}
-                  <ChartDisplay chartData={currentAnalysis.visualization} />
+                  <SingleChartWithActions chart={currentAnalysis.visualization} query={currentAnalysis.query} />
                 </Box>
               )}
 

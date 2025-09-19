@@ -55,10 +55,18 @@ const ReportViewer: React.FC = () => {
   const handleDownload = async (reportId: string) => {
     try {
       const response = await apiClient.getReport(reportId);
-      // Handle download
       window.open(response.data.url, '_blank');
     } catch (error) {
       console.error('Error downloading report:', error);
+    }
+  };
+
+  const handleDelete = async (reportId: string) => {
+    try {
+      await apiClient.deleteReport(reportId);
+      await fetchReports();
+    } catch (error) {
+      console.error('Error deleting report:', error);
     }
   };
 
@@ -137,7 +145,7 @@ const ReportViewer: React.FC = () => {
                   <IconButton size="small">
                     <ShareIcon />
                   </IconButton>
-                  <IconButton size="small" color="error">
+                  <IconButton size="small" color="error" onClick={() => handleDelete(report.report_id)}>
                     <DeleteIcon />
                   </IconButton>
                 </CardActions>

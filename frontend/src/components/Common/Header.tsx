@@ -18,6 +18,7 @@ import {
   Brightness4,
   Brightness7,
 } from '@mui/icons-material';
+import { useThemeMode } from '../../contexts/ThemeModeContext';
 
 interface HeaderProps {
   onMenuClick: () => void;
@@ -25,7 +26,7 @@ interface HeaderProps {
 
 const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
   const [anchorEl, setAnchorEl] = React.useState<null | HTMLElement>(null);
-  const [darkMode, setDarkMode] = React.useState(false);
+  const { mode, toggle } = useThemeMode();
 
   const handleProfileMenuOpen = (event: React.MouseEvent<HTMLElement>) => {
     setAnchorEl(event.currentTarget);
@@ -33,11 +34,6 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
 
   const handleMenuClose = () => {
     setAnchorEl(null);
-  };
-
-  const handleThemeToggle = () => {
-    setDarkMode(!darkMode);
-    // Implement theme toggle logic
   };
 
   return (
@@ -59,8 +55,8 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
         
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
           <Tooltip title="Toggle theme">
-            <IconButton color="inherit" onClick={handleThemeToggle}>
-              {darkMode ? <Brightness7 /> : <Brightness4 />}
+            <IconButton color="inherit" onClick={toggle}>
+              {mode === 'dark' ? <Brightness7 /> : <Brightness4 />}
             </IconButton>
           </Tooltip>
           

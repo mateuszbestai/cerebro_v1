@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   Box,
   Grid,
@@ -16,6 +16,10 @@ import {
   TextField,
   Badge,
   Chip,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
 } from '@mui/material';
 import {
   Dashboard as DashboardIcon,
@@ -40,12 +44,19 @@ import {
 } from '../../store/dashboardSlice';
 import ChartDisplay from '../Analysis/ChartDisplay';
 import { DragDropContext, Droppable, Draggable } from 'react-beautiful-dnd';
+import { useChat } from '../../contexts/ChatContext';
 
 const VisualizationsDashboard: React.FC = () => {
   const dispatch = useDispatch();
   const { charts, layout } = useSelector(
     (state: RootState) => state.dashboard
   );
+  const { sessions, currentSessionId } = useChat();
+  const [sessionFilter, setSessionFilter] = useState<string>(currentSessionId || 'all');
+  const filteredCharts = useMemo(() => {
+    if (sessionFilter === 'all') return charts;
+    return charts.filter(c => c.metadata?.chatSessionId === sessionFilter);
+  }, [charts, sessionFilter]);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [editingChart, setEditingChart] = useState<DashboardChart | null>(null);
   const [fullscreenChart, setFullscreenChart] = useState<DashboardChart | null>(null);
@@ -271,6 +282,16 @@ const VisualizationsDashboard: React.FC = () => {
             </Tooltip>
           </Box>
 
+          <FormControl size="small" sx={{ mr: 2, minWidth: 220 }}>
+            <InputLabel>Session</InputLabel>
+            <Select label="Session" value={sessionFilter} onChange={(e) => setSessionFilter(e.target.value)}>
+              <MenuItem value="all">All Sessions</MenuItem>
+              {sessions.map(s => (
+                <MenuItem key={s.id} value={s.id}>{s.title}</MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+
           <Button
             variant="outlined"
             startIcon={<SaveIcon />}
@@ -293,7 +314,7 @@ const VisualizationsDashboard: React.FC = () => {
       <Box sx={{ p: 3 }}>
         {layout === 'grid' && (
           <Grid container spacing={3}>
-            {charts.map((chart, index) => (
+            {filteredCharts.map((chart, index) => (
               <Grid item xs={12} md={6} lg={4} key={chart.id}>
                 {renderChart(chart, index)}
               </Grid>
@@ -303,7 +324,7 @@ const VisualizationsDashboard: React.FC = () => {
 
         {layout === 'list' && (
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-            {charts.map((chart, index) => (
+            {filteredCharts.map((chart, index) => (
               <Box key={chart.id}>{renderChart(chart, index)}</Box>
             ))}
           </Box>
@@ -319,7 +340,7 @@ const VisualizationsDashboard: React.FC = () => {
                   {...provided.droppableProps}
                   ref={provided.innerRef}
                 >
-                  {charts.map((chart, index) => (
+                  {filteredCharts.map((chart, index) => (
                     <Grid item xs={12} md={6} lg={4} key={chart.id}>
                       {renderChart(chart, index, true)}
                     </Grid>

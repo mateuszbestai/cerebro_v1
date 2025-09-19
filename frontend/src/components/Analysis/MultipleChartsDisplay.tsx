@@ -26,6 +26,7 @@ import { useDispatch } from 'react-redux';
 import { addMultipleCharts, DashboardChart } from '../../store/dashboardSlice';
 import ChartDisplay from './ChartDisplay';
 import { useNavigate } from 'react-router-dom';
+import { useChat } from '../../contexts/ChatContext';
 
 interface MultipleChartsDisplayProps {
   charts: Array<{
@@ -40,11 +41,13 @@ interface MultipleChartsDisplayProps {
 const MultipleChartsDisplay: React.FC<MultipleChartsDisplayProps> = ({ charts, query }) => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
+  const { currentSessionId, sessions } = useChat();
   const [selectedTab, setSelectedTab] = useState(0);
   const [fullscreenChart, setFullscreenChart] = useState<any>(null);
   const [sendDialogOpen, setSendDialogOpen] = useState(false);
 
   const handleSendToDashboard = () => {
+    const sessionTitle = sessions.find(s => s.id === currentSessionId)?.title;
     const dashboardCharts: DashboardChart[] = charts.map((chart, index) => ({
       id: `chart_${Date.now()}_${index}`,
       title: chart.title || `Chart ${index + 1}`,
@@ -55,6 +58,8 @@ const MultipleChartsDisplay: React.FC<MultipleChartsDisplayProps> = ({ charts, q
       timestamp: new Date().toISOString(),
       metadata: {
         query: query,
+        chatSessionId: currentSessionId,
+        chatTitle: sessionTitle,
       },
     }));
 

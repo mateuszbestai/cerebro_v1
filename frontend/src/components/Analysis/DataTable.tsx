@@ -22,6 +22,7 @@ import {
 } from '@mui/icons-material';
 import { useDispatch } from 'react-redux';
 import { addChart } from '../../store/dashboardSlice';
+import { useChat } from '../../contexts/ChatContext';
 
 interface DataTableProps {
   data: any[];
@@ -32,6 +33,7 @@ type Order = 'asc' | 'desc';
 
 const DataTable: React.FC<DataTableProps> = ({ data, title = 'Data Table' }) => {
   const dispatch = useDispatch();
+  const { currentSessionId, sessions } = useChat();
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [searchTerm, setSearchTerm] = useState('');
@@ -116,6 +118,7 @@ const DataTable: React.FC<DataTableProps> = ({ data, title = 'Data Table' }) => 
       layout: { title },
     };
 
+    const sessionTitle = sessions.find(s => s.id === currentSessionId)?.title;
     dispatch(
       addChart({
         id: `table_${Date.now()}`,
@@ -124,7 +127,7 @@ const DataTable: React.FC<DataTableProps> = ({ data, title = 'Data Table' }) => 
         type: 'table',
         source: 'chat',
         timestamp: new Date().toISOString(),
-        metadata: { description: 'Saved from chat results' },
+        metadata: { description: 'Saved from chat results', chatSessionId: currentSessionId, chatTitle: sessionTitle },
       })
     );
   };

@@ -229,6 +229,10 @@ class ApiClient {
     return response.data;
   }
 
+  async deleteReport(reportId: string): Promise<void> {
+    await this.axiosInstance.delete(`/reports/${reportId}`);
+  }
+
   // Health check
   async checkHealth(): Promise<{
     status: string;

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
@@ -17,26 +17,10 @@ import VisualizationsDashboard from './components/Visualizations/VisualizationsD
 // Contexts
 import { DatabaseProvider } from './contexts/DatabaseContext';
 import { ChatProvider } from './contexts/ChatContext';
+import { ThemeModeProvider, useThemeMode } from './contexts/ThemeModeContext';
 
 // Hooks
 import { useDatabase } from './contexts/DatabaseContext';
-
-const theme = createTheme({
-  palette: {
-    primary: {
-      main: '#0078D4',
-    },
-    secondary: {
-      main: '#40E0D0',
-    },
-    background: {
-      default: '#f5f5f5',
-    },
-  },
-  typography: {
-    fontFamily: '"Segoe UI", "Roboto", "Helvetica", "Arial", sans-serif',
-  },
-});
 
 function AppContent() {
   const { isConnected } = useDatabase();
@@ -80,21 +64,41 @@ function AppContent() {
   );
 }
 
+function AppWithTheme() {
+  const { mode } = useThemeMode();
+  const theme = useMemo(() => createTheme({
+    palette: {
+      mode,
+      primary: { main: '#0078D4' },
+      secondary: { main: '#40E0D0' },
+    },
+    typography: {
+      fontFamily: '"Segoe UI", "Roboto", "Helvetica", "Arial", sans-serif',
+    },
+  }), [mode]);
+
+  return (
+    <ThemeProvider theme={theme}>
+      <CssBaseline />
+      <DatabaseProvider>
+        <ChatProvider>
+          <Router>
+            <Layout>
+              <AppContent />
+            </Layout>
+          </Router>
+        </ChatProvider>
+      </DatabaseProvider>
+    </ThemeProvider>
+  );
+}
+
 function App() {
   return (
     <Provider store={store}>
-      <ThemeProvider theme={theme}>
-        <CssBaseline />
-        <DatabaseProvider>
-          <ChatProvider>
-            <Router>
-              <Layout>
-                <AppContent />
-              </Layout>
-            </Router>
-          </ChatProvider>
-        </DatabaseProvider>
-      </ThemeProvider>
+      <ThemeModeProvider>
+        <AppWithTheme />
+      </ThemeModeProvider>
     </Provider>
   );
 }

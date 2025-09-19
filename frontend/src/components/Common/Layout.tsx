@@ -23,7 +23,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
       <Sidebar 
         open={sidebarOpen} 
         onClose={handleDrawerToggle}
-        variant={isMobile ? 'temporary' : 'permanent'}
+        variant={isMobile ? 'temporary' : 'persistent'}
       />
       
       <Box
