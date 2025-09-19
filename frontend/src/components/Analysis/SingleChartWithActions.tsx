@@ -1,9 +1,6 @@
 import React from 'react';
-import { Box, IconButton, Tooltip, Button } from '@mui/material';
-import SendIcon from '@mui/icons-material/Send';
+import { Box, Tooltip, Button } from '@mui/material';
 import DashboardIcon from '@mui/icons-material/Dashboard';
-import FullscreenIcon from '@mui/icons-material/Fullscreen';
-import DownloadIcon from '@mui/icons-material/Download';
 import ChartDisplay from './ChartDisplay';
 import { useDispatch } from 'react-redux';
 import { addChart } from '../../store/dashboardSlice';
