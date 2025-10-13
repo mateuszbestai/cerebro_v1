@@ -13,7 +13,7 @@ logger = setup_logger(__name__)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Manage application lifecycle"""
-    logger.info("Starting AI Analysis Agent...")
+    logger.info("Starting Cerebro...")
     logger.info(f"Database configuration present: {settings.has_sql_config}")
     logger.info(f"OpenAI configuration present: {settings.has_openai_config}")
     
@@ -23,7 +23,7 @@ async def lifespan(app: FastAPI):
     yield
     
     # Cleanup
-    logger.info("Shutting down AI Analysis Agent...")
+    logger.info("Shutting down Cerebro...")
     
     # Disconnect any active database connections
     from app.api.routes.database import active_connections
@@ -36,7 +36,7 @@ async def lifespan(app: FastAPI):
 
 # Create FastAPI app
 app = FastAPI(
-    title="AI Analysis Agent",
+    title="Cerebro",
     description="AI-powered data analysis with Azure SQL and OpenAI",
     version="2.0.0",
     lifespan=lifespan
@@ -60,7 +60,7 @@ app.include_router(reports.router, prefix="/api/v1/reports", tags=["reports"])
 @app.get("/")
 async def root():
     return {
-        "message": "AI Analysis Agent API",
+        "message": "Cerebro API",
         "version": "2.0.0",
         "features": {
             "database_management": "Frontend-controlled database connections",

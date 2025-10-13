@@ -14,7 +14,7 @@ class Settings(BaseSettings):
     
     # API Configuration
     API_V1_STR: str = "/api/v1"
-    PROJECT_NAME: str = "AI Analysis Agent"
+    PROJECT_NAME: str = "Cerebro"
     
     # Azure SQL Database (with defaults to prevent crashes)
     AZURE_SQL_SERVER: str = os.getenv("AZURE_SQL_SERVER", "")
