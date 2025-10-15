@@ -31,6 +31,7 @@ interface ChatContextType {
   isConnected: boolean;
   connectWebSocket: () => void;
   disconnectWebSocket: () => void;
+  stopGeneration: () => void;
 }
 
 const ChatContext = createContext<ChatContextType | undefined>(undefined);
@@ -157,7 +158,20 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
     }
   }, [connectionId, getTableContext, executeQuery, selectedTables, databaseInfo, currentSessionId, saveSessionMessages, dispatch, tables]);
 
-  const clearMessages = useCallback(() => { setCurrentAnalysis(null); setError(null); saveSessionMessages(() => []); }, [saveSessionMessages]);
+  const stopGeneration = useCallback(() => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+      setIsLoading(false);
+    }
+  }, []);
+
+  const clearMessages = useCallback(() => {
+    stopGeneration();
+    setCurrentAnalysis(null);
+    setError(null);
+    saveSessionMessages(() => []);
+  }, [saveSessionMessages, stopGeneration]);
   const deleteMessage = useCallback((id: string) => { saveSessionMessages(prev => prev.filter(msg => msg.id !== id)); }, [saveSessionMessages]);
   const retryLastMessage = useCallback(async () => { if (lastMessageRef.current) await sendMessage(lastMessageRef.current); }, [sendMessage]);
 
@@ -199,7 +213,7 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
   }, []);
 
   return (
-    <ChatContext.Provider value={{ currentSessionId, sessions, messages, isLoading, currentAnalysis, error, sendMessage, clearMessages, deleteMessage, retryLastMessage, exportChat, newSession, switchSession, renameSession, isConnected, connectWebSocket, disconnectWebSocket }}>
+    <ChatContext.Provider value={{ currentSessionId, sessions, messages, isLoading, currentAnalysis, error, sendMessage, clearMessages, deleteMessage, retryLastMessage, exportChat, newSession, switchSession, renameSession, isConnected, connectWebSocket, disconnectWebSocket, stopGeneration }}>
       {children}
     </ChatContext.Provider>
   );

@@ -23,6 +23,8 @@ import {
   Refresh as RefreshIcon,
   Warning as WarningIcon,
   History as HistoryIcon,
+  Stop as StopIcon,
+  ClearAll as ClearAllIcon,
 } from '@mui/icons-material';
 import { useChat } from '../../contexts/ChatContext';
 import { useDatabase } from '../../contexts/DatabaseContext';
@@ -37,7 +39,7 @@ import { useSelector } from 'react-redux';
 import { RootState } from '../../store';
 
 const ChatInterface: React.FC = () => {
-  const { messages, isLoading, sendMessage, currentAnalysis } = useChat();
+  const { messages, isLoading, sendMessage, currentAnalysis, clearMessages, stopGeneration } = useChat();
   const { 
     isConnected, 
     databaseInfo, 
@@ -198,25 +200,57 @@ const ChatInterface: React.FC = () => {
                 </Typography>
               </Box>
               
-              {/* Chat sessions controls */}
-              <ChatSessionsControls />
-              
-              {currentAnalysis && (
-                <Tooltip title={showAnalysisPanel ? 'Hide Analysis' : 'Show Analysis'}>
-                  <IconButton 
-                    size="small"
-                    onClick={() => setShowAnalysisPanel(!showAnalysisPanel)}
-                  >
-                    <Badge 
-                      color="primary" 
-                      variant="dot" 
-                      invisible={!currentAnalysis.data && !currentAnalysis.visualization}
+              <Box display="flex" alignItems="center" gap={1}>
+                {/* Chat sessions controls */}
+                <ChatSessionsControls />
+
+                <Tooltip title="Stop response">
+                  <span>
+                    <Button
+                      size="small"
+                      variant="outlined"
+                      color="error"
+                      startIcon={<StopIcon />}
+                      onClick={stopGeneration}
+                      disabled={!isLoading}
                     >
-                      <TableIcon />
-                    </Badge>
-                  </IconButton>
+                      Stop
+                    </Button>
+                  </span>
                 </Tooltip>
-              )}
+
+                <Tooltip title="Clear conversation">
+                  <span>
+                    <Button
+                      size="small"
+                      variant="outlined"
+                      color="secondary"
+                      startIcon={<ClearAllIcon />}
+                      onClick={clearMessages}
+                      disabled={messages.length === 0}
+                    >
+                      Clear
+                    </Button>
+                  </span>
+                </Tooltip>
+              
+                {currentAnalysis && (
+                  <Tooltip title={showAnalysisPanel ? 'Hide Analysis' : 'Show Analysis'}>
+                    <IconButton 
+                      size="small"
+                      onClick={() => setShowAnalysisPanel(!showAnalysisPanel)}
+                    >
+                      <Badge 
+                        color="primary" 
+                        variant="dot" 
+                        invisible={!currentAnalysis.data && !currentAnalysis.visualization}
+                      >
+                        <TableIcon />
+                      </Badge>
+                    </IconButton>
+                  </Tooltip>
+                )}
+              </Box>
             </Box>
           </Box>
 
