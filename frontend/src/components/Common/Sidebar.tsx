@@ -12,12 +12,14 @@ import {
   Chip,
 } from '@mui/material';
 import {
+  RocketLaunch as RocketIcon,
   Chat as ChatIcon,
   Description as ReportIcon,
   Storage as DatabaseIcon,
   Timeline as TimelineIcon,
   Settings as SettingsIcon,
   Help as HelpIcon,
+  Bolt as BoltIcon,
 } from '@mui/icons-material';
 import { useNavigate, useLocation } from 'react-router-dom';
 
@@ -27,12 +29,16 @@ interface SidebarProps {
   variant?: 'permanent' | 'persistent' | 'temporary';
 }
 
+const drawerWidth = 260;
+
 const Sidebar: React.FC<SidebarProps> = ({ open, onClose, variant = 'permanent' }) => {
   const navigate = useNavigate();
   const location = useLocation();
 
   const menuItems = [
-    { text: 'Chat', icon: <ChatIcon />, path: '/' },
+    { text: 'Solutions Hub', icon: <RocketIcon />, path: '/' },
+    { text: 'Database Assistant', icon: <ChatIcon />, path: '/solutions/db' },
+    { text: 'Real-Time Preview', icon: <BoltIcon />, path: '/solutions/realtime' },
     { text: 'Reports', icon: <ReportIcon />, path: '/reports' },
     { text: 'Database', icon: <DatabaseIcon />, path: '/database' },
     { text: 'Visualizations', icon: <TimelineIcon />, path: '/visualizations' },
@@ -49,18 +55,22 @@ const Sidebar: React.FC<SidebarProps> = ({ open, onClose, variant = 'permanent' 
       open={open}
       onClose={onClose}
       sx={{
-        width: 240,
+        width: drawerWidth,
         flexShrink: 0,
         '& .MuiDrawer-paper': {
-          width: 240,
+          width: drawerWidth,
           boxSizing: 'border-box',
           mt: 8,
+          backgroundColor: 'var(--surface-2)',
+          color: 'var(--text)',
+          borderRight: '1px solid var(--border)',
+          backdropFilter: 'blur(12px)',
         },
       }}
     >
       <Box sx={{ overflow: 'auto', height: '100%', display: 'flex', flexDirection: 'column' }}>
-        <Box sx={{ p: 2 }}>
-          <Typography variant="caption" color="text.secondary">
+        <Box sx={{ p: 2, px: 3 }}>
+          <Typography variant="caption" sx={{ color: 'var(--text-muted)', letterSpacing: '0.18em' }}>
             NAVIGATION
           </Typography>
         </Box>
@@ -71,12 +81,35 @@ const Sidebar: React.FC<SidebarProps> = ({ open, onClose, variant = 'permanent' 
               <ListItemButton
                 selected={location.pathname === item.path}
                 onClick={() => navigate(item.path)}
+                sx={{
+                  mx: 1,
+                  borderRadius: 'var(--radius-sm)',
+                  color: 'var(--text-muted)',
+                  '&.Mui-selected': {
+                    color: 'var(--text)',
+                    backgroundColor: 'rgba(118,185,0,0.14)',
+                    '& .MuiListItemIcon-root': {
+                      color: 'var(--primary)',
+                    },
+                  },
+                  '&:hover': {
+                    backgroundColor: 'rgba(118,185,0,0.08)',
+                    color: 'var(--text)',
+                  },
+                }}
               >
-                <ListItemIcon sx={{ color: location.pathname === item.path ? 'primary.main' : 'inherit' }}>
+                <ListItemIcon
+                  sx={{
+                    color: location.pathname === item.path ? 'var(--primary)' : 'var(--text-muted)',
+                  }}
+                >
                   {item.icon}
                 </ListItemIcon>
-                <ListItemText primary={item.text} />
-                {item.text === 'Chat' && (
+                <ListItemText
+                  primaryTypographyProps={{ variant: 'body2', fontWeight: 500 }}
+                  primary={item.text}
+                />
+                {item.text === 'Database Assistant' && (
                   <Chip size="small" label="AI" color="primary" />
                 )}
               </ListItemButton>
@@ -86,21 +119,32 @@ const Sidebar: React.FC<SidebarProps> = ({ open, onClose, variant = 'permanent' 
         
         <Box sx={{ flexGrow: 1 }} />
         
-        <Divider />
+        <Divider sx={{ borderColor: 'rgba(44,53,47,0.6)' }} />
         
         <List>
           {bottomMenuItems.map((item) => (
             <ListItem key={item.text} disablePadding>
-              <ListItemButton onClick={() => navigate(item.path)}>
-                <ListItemIcon>{item.icon}</ListItemIcon>
-                <ListItemText primary={item.text} />
+              <ListItemButton
+                onClick={() => navigate(item.path)}
+                sx={{
+                  mx: 1,
+                  borderRadius: 'var(--radius-sm)',
+                  color: 'var(--text-muted)',
+                  '&:hover': {
+                    backgroundColor: 'rgba(118,185,0,0.08)',
+                    color: 'var(--text)',
+                  },
+                }}
+              >
+                <ListItemIcon sx={{ color: 'var(--text-muted)' }}>{item.icon}</ListItemIcon>
+                <ListItemText primaryTypographyProps={{ variant: 'body2', fontWeight: 500 }} primary={item.text} />
               </ListItemButton>
             </ListItem>
           ))}
         </List>
         
-        <Box sx={{ p: 2, textAlign: 'center' }}>
-          <Typography variant="caption" color="text.secondary">
+        <Box sx={{ p: 3, textAlign: 'center' }}>
+          <Typography variant="caption" sx={{ color: 'var(--text-muted)' }}>
             Version 1.0.0
           </Typography>
         </Box>

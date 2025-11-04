@@ -1,105 +1,162 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap');
+
+:root {
+  /* Base */
+  --bg: #0B0F0D;
+  --surface: #111614;
+  --surface-2: #1A1F1E;
+  --border: #2C352F;
+  --ring: #2C7A3B;
+
+  /* Text */
+  --text: #E6F0E6;
+  --text-dim: #A9B7A9;
+  --text-muted: #7E8A7E;
+
+  /* Accents */
+  --primary: #76B900;
+  --primary-600: #5F9900;
+  --primary-700: #487800;
+  --accent-bestai: #00B4D8;
+  --brand-bestai: var(--accent-bestai);
+  --accent: var(--primary);
+
+  /* States */
+  --ok: #5AD17A;
+  --warn: #FFC857;
+  --err: #FF6B6B;
+  --info: #57C7FF;
+
+  /* Effects */
+  --radius: 16px;
+  --radius-sm: 12px;
+  --shadow-1: 0 6px 20px rgba(0, 0, 0, 0.35);
+  --shadow-2: 0 18px 40px rgba(0, 0, 0, 0.45);
+  --blur: 10px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
 * {
-    margin: 0;
-    padding: 0;
-    box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: 'Inter', 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI',
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background-color: var(--bg);
+  color: var(--text);
+}
+
+code {
+  font-family: 'IBM Plex Mono', Menlo, Monaco, Consolas, 'Courier New', monospace;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--surface);
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(118, 185, 0, 0.4);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(118, 185, 0, 0.6);
+}
+
+/* Animations */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
   }
-  
-  body {
-    margin: 0;
-    font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, 'Roboto', 'Oxygen',
-      'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
-      sans-serif;
-    -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
-    /* Let MUI theme control background in light/dark modes */
-    background-color: unset;
+  to {
+    opacity: 1;
   }
-  
-  code {
-    font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
-      monospace;
-  }
-  
-  /* Custom scrollbar */
-  ::-webkit-scrollbar {
-    width: 8px;
-    height: 8px;
-  }
-  
-  ::-webkit-scrollbar-track {
-    background: #f1f1f1;
-  }
-  
-  ::-webkit-scrollbar-thumb {
-    background: #888;
-    border-radius: 4px;
-  }
-  
-  ::-webkit-scrollbar-thumb:hover {
-    background: #555;
-  }
-  
-  /* Animations */
-  @keyframes fadeIn {
-    from {
-      opacity: 0;
-    }
-    to {
-      opacity: 1;
-    }
-  }
-  
-  .fade-in {
-    animation: fadeIn 0.3s ease-in;
-  }
-  
-  /* Message styles for markdown rendering */
-  .message-content h1,
-  .message-content h2,
-  .message-content h3 {
-    margin-top: 16px;
-    margin-bottom: 8px;
-  }
-  
-  .message-content p {
-    margin-bottom: 8px;
-  }
-  
-  .message-content pre {
-    background-color: #f4f4f4;
-    border-radius: 4px;
-    padding: 12px;
-    overflow-x: auto;
-    margin: 8px 0;
-  }
-  
-  .message-content code {
-    background-color: #f4f4f4;
-    padding: 2px 4px;
-    border-radius: 3px;
-    font-size: 0.9em;
-  }
-  
-  .message-content ul,
-  .message-content ol {
-    margin-left: 20px;
-    margin-bottom: 8px;
-  }
-  
-  .message-content table {
-    border-collapse: collapse;
-    width: 100%;
-    margin: 8px 0;
-  }
-  
-  .message-content th,
-  .message-content td {
-    border: 1px solid #ddd;
-    padding: 8px;
-    text-align: left;
-  }
-  
-  .message-content th {
-    background-color: #f4f4f4;
-    font-weight: bold;
-  }
+}
+
+.fade-in {
+  animation: fadeIn 0.2s ease-out;
+}
+
+/* Message styles for markdown rendering */
+.message-content h1,
+.message-content h2,
+.message-content h3 {
+  margin-top: 16px;
+  margin-bottom: 8px;
+  color: var(--text);
+}
+
+.message-content p {
+  margin-bottom: 8px;
+  color: var(--text-dim);
+}
+
+.message-content pre {
+  background-color: var(--surface-2);
+  border-radius: var(--radius-sm);
+  padding: 12px;
+  overflow-x: auto;
+  margin: 8px 0;
+  border: 1px solid var(--border);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.02);
+}
+
+.message-content code {
+  background-color: rgba(118, 185, 0, 0.1);
+  color: var(--primary);
+  padding: 2px 4px;
+  border-radius: 3px;
+  font-size: 0.9em;
+}
+
+.message-content ul,
+.message-content ol {
+  margin-left: 20px;
+  margin-bottom: 8px;
+  color: var(--text-dim);
+}
+
+.message-content table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 8px 0;
+  background: var(--surface);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+
+.message-content th,
+.message-content td {
+  border: 1px solid var(--border);
+  padding: 8px;
+  text-align: left;
+  color: var(--text-dim);
+}
+
+.message-content th {
+  background-color: var(--surface-2);
+  font-weight: 600;
+  color: var(--text);
+}

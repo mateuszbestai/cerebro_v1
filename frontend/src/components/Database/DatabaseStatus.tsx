@@ -7,7 +7,6 @@ import {
   Chip,
   IconButton,
   Tooltip,
-  Alert,
   Collapse,
 } from '@mui/material';
 import {
@@ -63,17 +62,39 @@ const DatabaseStatus: React.FC<DatabaseStatusProps> = ({ onConnect }) => {
 
   if (!isConnected && !error && !isConnecting) {
     return (
-      <Alert 
-        severity="info" 
-        sx={{ m: 2, mb: 0 }}
-        action={
-          <Button color="inherit" size="small" onClick={onConnect}>
-            Connect Database
-          </Button>
-        }
+      <Paper
+        elevation={0}
+        sx={{
+          m: 2,
+          mb: 0,
+          p: 2,
+          borderRadius: 'var(--radius)',
+          border: '1px dashed rgba(118,185,0,0.35)',
+          background: 'rgba(26, 31, 30, 0.65)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: 2,
+        }}
       >
-        No database connected. Connect to a database to enable SQL analysis features.
-      </Alert>
+        <Box>
+          <Typography variant="subtitle2" sx={{ color: 'var(--text)', mb: 0.5 }}>
+            No database connected
+          </Typography>
+          <Typography variant="body2" sx={{ color: 'var(--text-dim)' }}>
+            Connect to unlock SQL analysis and contextual insights inside Cerebro.
+          </Typography>
+        </Box>
+        <Button
+          size="small"
+          variant="contained"
+          onClick={onConnect}
+          startIcon={<AddIcon />}
+          disabled={isConnecting}
+        >
+          {isConnecting ? 'Connecting...' : 'Connect'}
+        </Button>
+      </Paper>
     );
   }
 
@@ -84,9 +105,10 @@ const DatabaseStatus: React.FC<DatabaseStatusProps> = ({ onConnect }) => {
         p: 2, 
         m: 2,
         mb: 0,
-        bgcolor: 'background.default',
-        borderBottom: '1px solid',
-        borderColor: 'divider'
+        bgcolor: 'rgba(17, 22, 20, 0.85)',
+        border: '1px solid rgba(44,53,47,0.9)',
+        borderRadius: 'var(--radius)',
+        boxShadow: 'var(--shadow-1)'
       }}
     >
       <Box display="flex" alignItems="center" justifyContent="space-between">
@@ -169,7 +191,15 @@ const DatabaseStatus: React.FC<DatabaseStatusProps> = ({ onConnect }) => {
 
       {/* Expandable Details Section */}
       <Collapse in={showDetails && isConnected && !!databaseInfo}>
-        <Box sx={{ mt: 2, p: 2, bgcolor: 'grey.50', borderRadius: 1 }}>
+        <Box
+          sx={{
+            mt: 2,
+            p: 2,
+            bgcolor: 'rgba(26,31,30,0.75)',
+            borderRadius: 'var(--radius-sm)',
+            border: '1px solid rgba(44,53,47,0.8)',
+          }}
+        >
           <Typography variant="subtitle2" gutterBottom>
             Connection Details
           </Typography>
