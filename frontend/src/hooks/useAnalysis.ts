@@ -9,12 +9,14 @@ import {
 } from '../store/analysisSlice';
 import { apiClient } from '../services/api';
 import { AnalysisResult } from '../types';
+import { useModelOptions } from '../contexts/ModelContext';
 
 export const useAnalysis = () => {
   const dispatch = useDispatch();
   const { results, currentResult, isAnalyzing, error } = useSelector(
     (state: RootState) => state.analysis
   );
+  const { selectedModel } = useModelOptions();
 
   const runAnalysis = useCallback(
     async (query: string, data?: any) => {
@@ -22,7 +24,7 @@ export const useAnalysis = () => {
       dispatch(setError(undefined));
 
       try {
-        const response = await apiClient.runAnalysis({ query, data });
+        const response = await apiClient.runAnalysis({ query, data, model: selectedModel?.id });
         const analysisId = response.analysis_id;
 
         // Poll for results
@@ -58,7 +60,7 @@ export const useAnalysis = () => {
         dispatch(setAnalyzing(false));
       }
     },
-    [dispatch, results]
+    [dispatch, results, selectedModel]
   );
 
   return {

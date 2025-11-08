@@ -20,6 +20,7 @@ import RealTimePreview from './pages/RealTimePreview';
 import { DatabaseProvider } from './contexts/DatabaseContext';
 import { ChatProvider } from './contexts/ChatContext';
 import { ThemeModeProvider, useThemeMode } from './contexts/ThemeModeContext';
+import { ModelProvider } from './contexts/ModelContext';
 
 // Hooks
 import { useDatabase } from './contexts/DatabaseContext';
@@ -200,15 +201,17 @@ function AppWithTheme() {
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
-      <DatabaseProvider>
-        <ChatProvider>
-          <Router>
-            <Layout>
-              <AppContent />
-            </Layout>
-          </Router>
-        </ChatProvider>
-      </DatabaseProvider>
+      <ModelProvider>
+        <DatabaseProvider>
+          <ChatProvider>
+            <Router>
+              <Layout>
+                <AppContent />
+              </Layout>
+            </Router>
+          </ChatProvider>
+        </DatabaseProvider>
+      </ModelProvider>
     </ThemeProvider>
   );
 }

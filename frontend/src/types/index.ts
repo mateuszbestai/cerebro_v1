@@ -8,7 +8,7 @@ export interface Message {
     metadata?: Record<string, any>;
   }
   
-  export interface AnalysisResult {
+export interface AnalysisResult {
     query: string;
     intent: {
       type: string;
@@ -26,6 +26,7 @@ export interface Message {
     report?: string;
     statistics?: Record<string, any>;
     timestamp?: string;
+    model?: string;
   }
   
   export interface ChartData {

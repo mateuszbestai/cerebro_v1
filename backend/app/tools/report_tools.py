@@ -17,7 +17,8 @@ class ReportGenerationTool:
         self,
         title: str,
         data: Optional[Any] = None,
-        analysis_results: Optional[Dict[str, Any]] = None
+        analysis_results: Optional[Dict[str, Any]] = None,
+        model_id: Optional[str] = None
     ) -> Dict[str, Any]:
         """Generate a comprehensive report"""
         
@@ -30,7 +31,11 @@ class ReportGenerationTool:
             
             # Generate executive summary
             if data or analysis_results:
-                summary = await self._generate_executive_summary(data, analysis_results)
+                summary = await self._generate_executive_summary(
+                    data,
+                    analysis_results,
+                    model_id=model_id
+                )
                 report["executive_summary"] = summary
             
             # Add data overview section
@@ -44,7 +49,11 @@ class ReportGenerationTool:
                 report["sections"].append(analysis_section)
             
             # Generate insights
-            insights = await self._generate_insights(data, analysis_results)
+            insights = await self._generate_insights(
+                data,
+                analysis_results,
+                model_id=model_id
+            )
             if insights:
                 report["sections"].append({
                     "title": "Key Insights",
@@ -52,7 +61,11 @@ class ReportGenerationTool:
                 })
             
             # Generate recommendations
-            recommendations = await self._generate_recommendations(data, analysis_results)
+            recommendations = await self._generate_recommendations(
+                data,
+                analysis_results,
+                model_id=model_id
+            )
             if recommendations:
                 report["sections"].append({
                     "title": "Recommendations",
@@ -68,7 +81,8 @@ class ReportGenerationTool:
     async def _generate_executive_summary(
         self,
         data: Any,
-        analysis_results: Optional[Dict[str, Any]]
+        analysis_results: Optional[Dict[str, Any]],
+        model_id: Optional[str] = None
     ) -> str:
         """Generate executive summary using LLM"""
         
@@ -85,12 +99,13 @@ class ReportGenerationTool:
         4. Focus on business value
         """
         
-        return await self.llm_service.generate_response(prompt)
+        return await self.llm_service.generate_response(prompt, model_id=model_id)
     
     async def _generate_insights(
         self,
         data: Any,
-        analysis_results: Optional[Dict[str, Any]]
+        analysis_results: Optional[Dict[str, Any]],
+        model_id: Optional[str] = None
     ) -> str:
         """Generate insights from data and analysis"""
         
@@ -107,12 +122,13 @@ class ReportGenerationTool:
         4. Business implications
         """
         
-        return await self.llm_service.generate_response(prompt)
+        return await self.llm_service.generate_response(prompt, model_id=model_id)
     
     async def _generate_recommendations(
         self,
         data: Any,
-        analysis_results: Optional[Dict[str, Any]]
+        analysis_results: Optional[Dict[str, Any]],
+        model_id: Optional[str] = None
     ) -> str:
         """Generate actionable recommendations"""
         
@@ -129,7 +145,7 @@ class ReportGenerationTool:
         3. Implementation priority
         """
         
-        return await self.llm_service.generate_response(prompt)
+        return await self.llm_service.generate_response(prompt, model_id=model_id)
     
     def _create_data_overview_section(self, data: Any) -> Dict[str, Any]:
         """Create data overview section"""

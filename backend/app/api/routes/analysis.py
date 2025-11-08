@@ -9,6 +9,7 @@ from app.agents.pandas_agent import PandasAgent
 from app.services.azure_openai import AzureOpenAIService
 from app.tools.visualization import VisualizationTool
 from app.database.connection import DatabaseManager
+from app.api.routes.chat import get_orchestrator
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -18,6 +19,11 @@ class AnalysisRequest(BaseModel):
     data: Optional[Any] = None
     analysis_type: Optional[str] = "auto"
     visualization_required: bool = False
+    connection_id: Optional[str] = None
+    database_context: Optional[str] = None
+    selected_tables: Optional[List[str]] = None
+    context: Optional[Dict[str, Any]] = None
+    model: Optional[str] = None
 
 class AnalysisResponse(BaseModel):
     analysis_id: str
@@ -27,12 +33,88 @@ class AnalysisResponse(BaseModel):
 
 # Initialize services
 llm_service = AzureOpenAIService()
-sql_agent = SQLAgent(llm_service.get_llm())
-pandas_agent = PandasAgent(llm_service.get_llm())
+sql_agent = SQLAgent(llm_service.get_llm(require_chat=True))
+pandas_agent = PandasAgent(llm_service.get_llm(require_chat=True))
 viz_tool = VisualizationTool()
 
 # Store for async analysis results
 analysis_store = {}
+
+def _should_use_frontend_connection(request: AnalysisRequest) -> bool:
+    """Determine if we should reuse the active frontend-managed DB connection"""
+    if request.connection_id:
+        return True
+    if request.context and request.context.get("database_connection_id"):
+        return True
+    return False
+
+async def _run_frontend_connected_analysis(request: AnalysisRequest) -> Dict[str, Any]:
+    """Run analysis through the AgentOrchestrator using frontend-provided context."""
+    orchestrator = get_orchestrator()
+    effective_context: Dict[str, Any] = dict(request.context or {})
+    
+    if request.connection_id:
+        effective_context["database_connection_id"] = request.connection_id
+    if request.database_context:
+        effective_context["database_context"] = request.database_context
+    if request.selected_tables:
+        effective_context["selected_tables"] = request.selected_tables
+    if request.data is not None:
+        effective_context["data"] = request.data
+    if request.analysis_type:
+        effective_context["analysis_type"] = request.analysis_type
+    if request.visualization_required:
+        effective_context["visualization_required"] = request.visualization_required
+    if request.model:
+        effective_context["model"] = request.model
+    
+    return await orchestrator.process_query(request.query, effective_context)
+
+async def _run_legacy_analysis(request: AnalysisRequest) -> Dict[str, Any]:
+    """Fallback analysis path that relies on environment-configured services."""
+    result: Dict[str, Any] = {}
+    llm = llm_service.get_llm(request.model, require_chat=True)
+    local_sql_agent = SQLAgent(llm)
+    local_pandas_agent = PandasAgent(llm)
+    
+    if request.analysis_type == "sql" or "SELECT" in request.query.upper():
+        sql_result = await local_sql_agent.execute_query(request.query)
+        result["data"] = sql_result.get("data")
+        result["query"] = sql_result.get("query")
+        result["explanation"] = sql_result.get("explanation")
+        
+        if request.visualization_required and sql_result.get("data"):
+            viz = await viz_tool.create_chart(sql_result["data"])
+            result["visualization"] = viz
+    
+    elif request.analysis_type == "pandas" or request.data is not None:
+        pandas_result = await local_pandas_agent.analyze_data(
+            request.query,
+            request.data
+        )
+        result["data"] = pandas_result.get("data")
+        result["analysis"] = pandas_result.get("analysis")
+        result["statistics"] = pandas_result.get("statistics")
+
+        if request.visualization_required:
+            try:
+                dataset_for_chart = (
+                    request.data if request.data is not None else pandas_result.get("data")
+                )
+                if dataset_for_chart:
+                    viz = await viz_tool.create_chart(dataset_for_chart)
+                    result["visualization"] = viz
+            except Exception as viz_err:
+                logger.error(f"Visualization error (pandas flow): {str(viz_err)}")
+    
+    else:
+        response = await llm_service.generate_response(
+            request.query,
+            model_id=request.model
+        )
+        result["analysis"] = response
+    
+    return result
 
 @router.post("/run", response_model=AnalysisResponse)
 async def run_analysis(
@@ -64,46 +146,10 @@ async def run_analysis(
 async def perform_analysis(analysis_id: str, request: AnalysisRequest):
     '''Perform the actual analysis'''
     try:
-        result = {}
-        
-        # Determine analysis type
-        if request.analysis_type == "sql" or "SELECT" in request.query.upper():
-            # SQL analysis
-            sql_result = await sql_agent.execute_query(request.query)
-            result["data"] = sql_result["data"]
-            result["query"] = sql_result["query"]
-            result["explanation"] = sql_result["explanation"]
-            
-            # Generate visualization if requested
-            if request.visualization_required and sql_result["data"]:
-                viz = await viz_tool.create_chart(sql_result["data"])
-                result["visualization"] = viz
-        
-        elif request.analysis_type == "pandas" or request.data is not None:
-            # Pandas analysis
-            pandas_result = await pandas_agent.analyze_data(
-                request.query,
-                request.data
-            )
-            result["data"] = pandas_result["data"]
-            result["analysis"] = pandas_result["analysis"]
-            result["statistics"] = pandas_result.get("statistics")
-
-            # Generate visualization if requested (mirror SQL behavior)
-            if request.visualization_required:
-                try:
-                    # Prefer the input dataset if provided; fall back to pandas output if chartable
-                    dataset_for_chart = request.data if request.data is not None else pandas_result.get("data")
-                    if dataset_for_chart:
-                        viz = await viz_tool.create_chart(dataset_for_chart)
-                        result["visualization"] = viz
-                except Exception as viz_err:
-                    logger.error(f"Visualization error (pandas flow): {str(viz_err)}")
-        
+        if _should_use_frontend_connection(request):
+            result = await _run_frontend_connected_analysis(request)
         else:
-            # General analysis using LLM
-            response = await llm_service.generate_response(request.query)
-            result["analysis"] = response
+            result = await _run_legacy_analysis(request)
         
         # Update store
         analysis_store[analysis_id] = {

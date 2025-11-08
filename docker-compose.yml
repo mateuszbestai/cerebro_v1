@@ -6,16 +6,11 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     container_name: ai-analysis-backend
+    env_file:
+      - backend/.env
     ports:
       - "8000:8000"
     environment:
-      - AZURE_SQL_SERVER=${AZURE_SQL_SERVER}
-      - AZURE_SQL_DATABASE=${AZURE_SQL_DATABASE}
-      - AZURE_SQL_USERNAME=${AZURE_SQL_USERNAME}
-      - AZURE_SQL_PASSWORD=${AZURE_SQL_PASSWORD}
-      - AZURE_OPENAI_API_KEY=${AZURE_OPENAI_API_KEY}
-      - AZURE_OPENAI_ENDPOINT=${AZURE_OPENAI_ENDPOINT}
-      - AZURE_OPENAI_DEPLOYMENT_NAME=${AZURE_OPENAI_DEPLOYMENT_NAME}
       - REDIS_URL=redis://redis:6379
       - ODBC_DRIVER=FreeTDS  # Explicitly set the driver
     depends_on:
@@ -32,8 +27,8 @@ services:
       dockerfile: Dockerfile
     container_name: ai-analysis-frontend
     environment:
-      - REACT_APP_API_URL=http://backend:8000/api/v1
-      - REACT_APP_WS_URL=ws://backend:8000/ws
+      - VITE_API_URL=/api/v1
+      - VITE_WS_URL=
     depends_on:
       - backend
     networks:

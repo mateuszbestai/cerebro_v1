@@ -19,7 +19,7 @@ class LangChainService:
     
     def __init__(self):
         self.llm_service = AzureOpenAIService()
-        self.llm = self.llm_service.get_llm()
+        self.llm = self.llm_service.get_llm(require_chat=True)
         self.tools = self._initialize_tools()
         self.memory = ConversationBufferWindowMemory(
             k=10,

@@ -21,6 +21,7 @@ class ReportRequest(BaseModel):
     analysis_results: Optional[Dict[str, Any]] = None
     format: str = "pdf"  # pdf, html, markdown
     include_charts: bool = True
+    model: Optional[str] = None
 
 class ReportResponse(BaseModel):
     report_id: str
@@ -76,7 +77,8 @@ async def create_report(report_id: str, request: ReportRequest):
         report_content = await report_tool.generate_report(
             request.description or request.title,
             request.data,
-            request.analysis_results
+            request.analysis_results,
+            model_id=request.model
         )
         
         # Add executive summary using LLM
@@ -85,7 +87,8 @@ async def create_report(report_id: str, request: ReportRequest):
                 {
                     "data": request.data,
                     "analysis": request.analysis_results
-                }
+                },
+                model_id=request.model
             )
             report_content["executive_summary"] = summary
         

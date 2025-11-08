@@ -10,6 +10,7 @@ const WS_BASE_URL: string = (import.meta.env.VITE_WS_URL as string) || (
 interface ChatMessage {
   message: string;
   context?: any;
+  model?: string;
 }
 
 interface ChatResponse {
@@ -29,11 +30,24 @@ interface ChatResponse {
   error?: string;
 }
 
+export interface ModelOption {
+  id: string;
+  label: string;
+  mode: string;
+  default?: boolean;
+  deployment?: string;
+}
+
 interface AnalysisRequest {
   query: string;
   data?: any;
   analysis_type?: string;
   visualization_required?: boolean;
+  connection_id?: string;
+  database_context?: string;
+  selected_tables?: string[];
+  context?: Record<string, any>;
+  model?: string;
 }
 
 interface AnalysisResponse {
@@ -50,6 +64,7 @@ interface ReportRequest {
   analysis_results?: any;
   format?: string;
   include_charts?: boolean;
+  model?: string;
 }
 
 interface ReportResponse {
@@ -107,11 +122,14 @@ class ApiClient {
   async sendChatMessage(
     message: string, 
     context?: any,
-    signal?: AbortSignal
+    signal?: AbortSignal,
+    modelId?: string
   ): Promise<ChatResponse> {
+    const payload: ChatMessage = { message, context };
+    if (modelId) payload.model = modelId;
     const response = await this.axiosInstance.post<ChatResponse>(
       '/chat/message',
-      { message, context },
+      payload,
       { signal }
     );
     return response.data;
@@ -274,6 +292,10 @@ class ApiClient {
 
   isAuthenticated(): boolean {
     return !!localStorage.getItem('auth_token');
+  }
+  async getAvailableModels(): Promise<{ models: ModelOption[]; default_model?: string }> {
+    const response = await this.axiosInstance.get<{ models: ModelOption[]; default_model?: string }>('/chat/models');
+    return response.data;
   }
 }
 

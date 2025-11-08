@@ -9,11 +9,16 @@ export interface Message {
     metadata?: MessageMetadata;
   }
   
-  export interface MessageMetadata {
+export interface MessageMetadata {
     analysis_id?: string;
     has_visualization?: boolean;
     has_data?: boolean;
     query_type?: string;
+    model?: string;
+    chat_session_id?: string;
+    table_context?: string[];
+    execution_time?: number;
+    sql_query?: string;
   }
   
   export interface ChatState {
@@ -28,6 +33,7 @@ export interface Message {
     message: string;
     context?: any;
     session_id?: string;
+    model?: string;
   }
   
   export interface ChatResponse {

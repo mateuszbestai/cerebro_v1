@@ -3,6 +3,11 @@ export interface AnalysisRequest {
     data?: any;
     analysis_type?: 'auto' | 'sql' | 'pandas';
     visualization_required?: boolean;
+    connection_id?: string;
+    database_context?: string;
+    selected_tables?: string[];
+    context?: Record<string, any>;
+    model?: string;
   }
   
   export interface AnalysisResponse {
@@ -12,7 +17,7 @@ export interface AnalysisRequest {
     error?: string;
   }
   
-  export interface AnalysisResult {
+export interface AnalysisResult {
     query: string;
     intent: AnalysisIntent;
     response: string;
@@ -20,6 +25,11 @@ export interface AnalysisRequest {
     visualization?: ChartData;
     report?: string;
     statistics?: Record<string, any>;
+    sql_query?: string;
+    columns?: string[];
+    row_count?: number;
+    model?: string;
+    timestamp?: string;
   }
   
   export interface AnalysisIntent {
@@ -34,9 +44,11 @@ export interface AnalysisRequest {
     config?: any;
   }
   
-  export interface AnalysisState {
+export interface AnalysisState {
     results: AnalysisResult[];
     currentResult?: AnalysisResult;
+    history: AnalysisResult[];
+    currentHistoryIndex: number;
     isAnalyzing: boolean;
     error?: string;
   }

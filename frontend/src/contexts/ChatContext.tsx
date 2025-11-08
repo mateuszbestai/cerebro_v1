@@ -4,6 +4,7 @@ import { useDatabase } from '../contexts/DatabaseContext';
 import { Message } from '../types';
 import { useDispatch } from 'react-redux';
 import { addResult } from '../store/analysisSlice';
+import { useModelOptions } from './ModelContext';
 
 interface ChatSession {
   id: string;
@@ -64,6 +65,7 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
   const [error, setError] = useState<string | null>(null);
   const [isConnected, setIsConnected] = useState(false);
   const dispatch = useDispatch();
+  const { selectedModel } = useModelOptions();
   
   const abortControllerRef = useRef<AbortController | null>(null);
   const wsConnectionRef = useRef<WebSocket | null>(null);
@@ -104,7 +106,7 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
     abortControllerRef.current = new AbortController();
     lastMessageRef.current = content;
 
-    const userMessage: Message = { id: `msg_${Date.now()}`, role: 'user', content, timestamp: new Date().toISOString(), metadata: { table_context: selectedTables, chat_session_id: currentSessionId } } as any;
+    const userMessage: Message = { id: `msg_${Date.now()}`, role: 'user', content, timestamp: new Date().toISOString(), metadata: { table_context: selectedTables, chat_session_id: currentSessionId, model: selectedModel?.id } } as any;
     saveSessionMessages(prev => [...prev, userMessage]);
     setIsLoading(true);
     setError(null);
@@ -123,7 +125,7 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
       }
 
       const startTime = Date.now();
-      const response = await apiClient.sendChatMessage(content, context, abortControllerRef.current.signal);
+      const response = await apiClient.sendChatMessage(content, context, abortControllerRef.current.signal, selectedModel?.id);
       const executionTime = Date.now() - startTime;
 
       let enrichedAnalysis = response.analysis;
@@ -137,26 +139,40 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
         }
       }
 
-      const assistantMessage: Message = { id: `msg_${Date.now() + 1}`, role: 'assistant', content: response.response, timestamp: new Date().toISOString(), analysis: enrichedAnalysis, metadata: { sql_query: enrichedAnalysis?.sql_query, execution_time: executionTime, chat_session_id: currentSessionId } } as any;
+      const assistantMessage: Message = { id: `msg_${Date.now() + 1}`, role: 'assistant', content: response.response, timestamp: new Date().toISOString(), analysis: enrichedAnalysis, metadata: { sql_query: enrichedAnalysis?.sql_query, execution_time: executionTime, chat_session_id: currentSessionId, model: selectedModel?.id } } as any;
       saveSessionMessages(prev => [...prev, assistantMessage]);
 
       if (enrichedAnalysis) {
         setCurrentAnalysis(enrichedAnalysis);
         try {
-          dispatch(addResult({ query: content, intent: enrichedAnalysis.intent || { type: 'general' }, response: response.response, data: enrichedAnalysis.data, visualization: enrichedAnalysis.visualization, visualizations: enrichedAnalysis.visualizations, sql_query: enrichedAnalysis.sql_query, columns: enrichedAnalysis.columns, row_count: enrichedAnalysis.row_count, report: enrichedAnalysis.report, statistics: enrichedAnalysis.statistics, timestamp: new Date().toISOString() }));
+          dispatch(addResult({
+            query: content,
+            intent: enrichedAnalysis.intent || { type: 'general' },
+            response: response.response,
+            data: enrichedAnalysis.data,
+            visualization: enrichedAnalysis.visualization,
+            visualizations: enrichedAnalysis.visualizations,
+            sql_query: enrichedAnalysis.sql_query,
+            columns: enrichedAnalysis.columns,
+            row_count: enrichedAnalysis.row_count,
+            report: enrichedAnalysis.report,
+            statistics: enrichedAnalysis.statistics,
+            timestamp: new Date().toISOString(),
+            model: selectedModel?.id,
+          }));
         } catch (e) { console.warn('Failed to add analysis result to history:', e); }
       }
     } catch (error: any) {
       if (error.name === 'AbortError') return;
       const errorMessage = error.response?.data?.detail || error.message || 'Unknown error occurred';
       setError(errorMessage);
-      const errorMsg: Message = { id: `msg_${Date.now() + 1}}`, role: 'assistant', content: `I encountered an error: ${errorMessage}` as string, timestamp: new Date().toISOString(), error: true } as any;
+      const errorMsg: Message = { id: `msg_${Date.now() + 1}}`, role: 'assistant', content: `I encountered an error: ${errorMessage}` as string, timestamp: new Date().toISOString(), error: true, metadata: { model: selectedModel?.id } } as any;
       saveSessionMessages(prev => [...prev, errorMsg]);
     } finally {
       setIsLoading(false);
       abortControllerRef.current = null;
     }
-  }, [connectionId, getTableContext, executeQuery, selectedTables, databaseInfo, currentSessionId, saveSessionMessages, dispatch, tables]);
+  }, [connectionId, getTableContext, executeQuery, selectedTables, databaseInfo, currentSessionId, saveSessionMessages, dispatch, tables, selectedModel]);
 
   const stopGeneration = useCallback(() => {
     if (abortControllerRef.current) {

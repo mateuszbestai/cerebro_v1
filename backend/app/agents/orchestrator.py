@@ -17,8 +17,8 @@ class AgentOrchestrator:
         self.llm_service = AzureOpenAIService()
         self.visualization_tool = VisualizationTool()
         self.report_tool = ReportGenerationTool()
-        # Initialize pandas agent for DataFrame analysis
-        self.pandas_agent = PandasAgent(self.llm_service.get_llm())
+        # Cache pandas agents per model to respect user selections
+        self.pandas_agents: Dict[str, PandasAgent] = {}
         self.memory = ConversationBufferMemory(
             memory_key="chat_history",
             return_messages=True
@@ -33,16 +33,37 @@ class AgentOrchestrator:
         Process user query with database context from frontend
         """
         try:
+            context = dict(context or {})
+            
             # Check if we have a database connection from the frontend
-            connection_id = context.get("database_connection_id") if context else None
-            database_context = context.get("database_context") if context else None
+            connection_id = context.get("database_connection_id")
+            database_context = context.get("database_context")
+            selected_tables = context.get("selected_tables")
+            forced_analysis_type = (
+                context.get("analysis_type").lower()
+                if isinstance(context.get("analysis_type"), str)
+                else None
+            )
+            force_visualization = bool(context.get("visualization_required"))
+            preferred_model = context.get("model")
+            model_id = self.llm_service.resolve_model_id(preferred_model)
+            if not model_id:
+                raise ValueError("No Azure OpenAI model configured")
             
-            # Analyze query intent with database context
-            intent = await self._analyze_intent(query, database_context)
+            # Analyze query intent with database context or honor explicit override
+            intent_override = (
+                self._build_forced_intent(forced_analysis_type)
+                if forced_analysis_type
+                else None
+            )
+            if intent_override:
+                intent = intent_override
+            else:
+                intent = await self._analyze_intent(query, database_context, model_id=model_id)
 
-            # Optional hints from frontend
-            selected_tables = context.get("selected_tables") if context else None
-            
+            if force_visualization:
+                intent["needs_visualization"] = True
+
             result = {
                 "query": query,
                 "intent": intent,
@@ -50,7 +71,8 @@ class AgentOrchestrator:
                 "data": None,
                 "visualization": None,
                 "report": None,
-                "sql_query": None
+                "sql_query": None,
+                "model": model_id
             }
             
             if intent["type"] == "sql_query" and connection_id:
@@ -60,7 +82,8 @@ class AgentOrchestrator:
                     connection_id, 
                     database_context,
                     intent,
-                    selected_tables
+                    selected_tables,
+                    model_id
                 )
                 
             elif intent["type"] == "data_analysis" and (connection_id or (context and context.get("data"))):
@@ -71,7 +94,8 @@ class AgentOrchestrator:
                     database_context,
                     context.get("data") if context else None,
                     intent,
-                    selected_tables
+                    selected_tables,
+                    model_id
                 )
                 
             elif intent["type"] == "report_generation":
@@ -79,13 +103,15 @@ class AgentOrchestrator:
                 result = await self._handle_report_generation(
                     query,
                     connection_id,
-                    context
+                    context,
+                    model_id
                 )
                 
             else:
                 # General query or no database connection
-                response = await self._handle_general_query(query, database_context)
+                response = await self._handle_general_query(query, database_context, model_id=model_id)
                 result["response"] = response
+                result["model"] = model_id
             
             # Store in memory
             self.memory.save_context(
@@ -106,6 +132,30 @@ class AgentOrchestrator:
                 "visualization": None,
                 "report": None
             }
+
+    def _build_forced_intent(self, analysis_type: Optional[str]) -> Optional[Dict[str, Any]]:
+        """Map explicit analysis_type hints to orchestrator intent structures."""
+        if not analysis_type:
+            return None
+        normalized = analysis_type.lower()
+        mapping = {
+            "sql": "sql_query",
+            "sql_query": "sql_query",
+            "database": "sql_query",
+            "analysis": "data_analysis",
+            "data_analysis": "data_analysis",
+            "pandas": "data_analysis",
+            "report": "report_generation",
+            "report_generation": "report_generation",
+            "general": "general",
+            "chat": "general",
+        }
+        intent_type = mapping.get(normalized)
+        if not intent_type:
+            return None
+        if intent_type == "general":
+            return {"type": "general"}
+        return {"type": intent_type}
     
     async def _handle_sql_query(
         self, 
@@ -113,7 +163,8 @@ class AgentOrchestrator:
         connection_id: str,
         database_context: str,
         intent: Dict[str, Any],
-        selected_tables: Optional[List[str]] = None
+        selected_tables: Optional[List[str]] = None,
+        model_id: Optional[str] = None
     ) -> Dict[str, Any]:
         """Handle SQL queries using the frontend connection"""
         
@@ -133,6 +184,7 @@ class AgentOrchestrator:
                 database_context,
                 connection_id=connection_id,
                 selected_tables=selected_tables,
+                model_id=model_id
             )
             
             # Execute the query
@@ -146,6 +198,7 @@ class AgentOrchestrator:
                     database_context,
                     connection_id=connection_id,
                     selected_tables=selected_tables,
+                    model_id=model_id
                 )
                 query_result = await execute_query_internal(connection_id, sql_query)
             
@@ -154,7 +207,8 @@ class AgentOrchestrator:
                 explanation = await self._explain_sql_results(
                     query, 
                     sql_query, 
-                    query_result
+                    query_result,
+                    model_id=model_id
                 )
                 
                 result = {
@@ -164,7 +218,8 @@ class AgentOrchestrator:
                     "data": query_result.get("data"),
                     "sql_query": sql_query,
                     "columns": query_result.get("columns"),
-                    "row_count": query_result.get("row_count")
+                    "row_count": query_result.get("row_count"),
+                    "model": model_id
                 }
                 
                 # Generate visualization if needed
@@ -193,7 +248,8 @@ class AgentOrchestrator:
                     "intent": intent,
                     "response": f"Query failed: {query_result.get('error', 'Unknown error')}",
                     "error": query_result.get("error"),
-                    "sql_query": sql_query
+                    "sql_query": sql_query,
+                    "model": model_id
                 }
                 
         except Exception as e:
@@ -202,10 +258,18 @@ class AgentOrchestrator:
                 "query": query,
                 "intent": intent,
                 "response": f"Failed to execute SQL query: {str(e)}",
-                "error": str(e)
+                "error": str(e),
+                "model": model_id
             }
     
-    async def _generate_sql_query(self, natural_language: str, database_context: str, connection_id: Optional[str] = None, selected_tables: Optional[List[str]] = None) -> str:
+    async def _generate_sql_query(
+        self,
+        natural_language: str,
+        database_context: str,
+        connection_id: Optional[str] = None,
+        selected_tables: Optional[List[str]] = None,
+        model_id: Optional[str] = None
+    ) -> str:
         """Generate SQL query from natural language using database context"""
         
         # Optionally include concrete schema details for selected tables
@@ -242,7 +306,7 @@ class AgentOrchestrator:
         SQL Query:
         """
         
-        sql_query = await self.llm_service.generate_response(prompt)
+        sql_query = await self.llm_service.generate_response(prompt, model_id=model_id)
         
         # Clean up and sanitize the query for SQL Server
         sql_query = sql_query.strip()
@@ -302,7 +366,8 @@ class AgentOrchestrator:
         self, 
         original_query: str,
         sql_query: str,
-        query_result: Dict[str, Any]
+        query_result: Dict[str, Any],
+        model_id: Optional[str] = None
     ) -> str:
         """Generate explanation of SQL query results"""
         
@@ -343,7 +408,7 @@ class AgentOrchestrator:
         - If the data shows concerning patterns, highlight them constructively
         """
         
-        return await self.llm_service.generate_response(prompt)
+        return await self.llm_service.generate_response(prompt, model_id=model_id)
     
     async def _handle_data_analysis(
         self,
@@ -352,7 +417,8 @@ class AgentOrchestrator:
         database_context: str,
         existing_data: Optional[Any] = None,
         intent: Optional[Dict[str, Any]] = None,
-        selected_tables: Optional[List[str]] = None
+        selected_tables: Optional[List[str]] = None,
+        model_id: Optional[str] = None
     ) -> Dict[str, Any]:
         """Handle data analysis requests using the PandasAgent when possible"""
         
@@ -367,7 +433,8 @@ class AgentOrchestrator:
                         "query": query,
                         "intent": {"type": "data_analysis"},
                         "response": "No dataset provided and no database connection available to fetch data.",
-                        "error": "Missing data source"
+                        "error": "Missing data source",
+                        "model": model_id
                     }
                 # Fetch data from database first
                 sql_query = await self._generate_sql_query(
@@ -375,6 +442,7 @@ class AgentOrchestrator:
                     database_context,
                     connection_id=connection_id,
                     selected_tables=selected_tables,
+                    model_id=model_id
                 )
                 from app.api.routes.database import execute_query_internal
                 query_result = await execute_query_internal(connection_id, sql_query)
@@ -383,12 +451,15 @@ class AgentOrchestrator:
                         "query": query,
                         "intent": {"type": "data_analysis"},
                         "response": "Unable to fetch data for analysis",
-                        "error": query_result.get("error")
+                        "error": query_result.get("error"),
+                        "model": model_id
                     }
                 data_for_analysis = query_result["data"]
             
+            pandas_agent = self._get_pandas_agent(model_id)
+            
             # Run pandas agent analysis
-            pandas_result = await self.pandas_agent.analyze_data(
+            pandas_result = await pandas_agent.analyze_data(
                 query,
                 data=data_for_analysis
             )
@@ -398,6 +469,7 @@ class AgentOrchestrator:
                 "intent": {"type": "data_analysis"} if intent is None else intent,
                 "response": pandas_result.get("analysis"),
                 "data": data_for_analysis,
+                "model": model_id
             }
             if sql_query:
                 result["sql_query"] = sql_query
@@ -430,10 +502,11 @@ class AgentOrchestrator:
                 "query": query,
                 "intent": {"type": "data_analysis"},
                 "response": f"Analysis failed: {str(e)}",
-                "error": str(e)
+                "error": str(e),
+                "model": model_id
             }
     
-    async def _analyze_existing_data(self, query: str, data: Any) -> str:
+    async def _analyze_existing_data(self, query: str, data: Any, model_id: Optional[str] = None) -> str:
         """Analyze existing data (fallback path if pandas agent unavailable)"""
         
         import pandas as pd
@@ -475,15 +548,27 @@ class AgentOrchestrator:
             - Plain language, avoiding technical jargon
             """
             
-            return await self.llm_service.generate_response(prompt)
+            return await self.llm_service.generate_response(prompt, model_id=model_id)
         
         return "No data available for analysis"
+
+    def _get_pandas_agent(self, model_id: Optional[str]) -> PandasAgent:
+        """Return cached pandas agent for the requested model."""
+        resolved_model = self.llm_service.resolve_model_id(model_id)
+        if not resolved_model:
+            raise ValueError("No Azure OpenAI model configured for pandas analysis")
+        if resolved_model not in self.pandas_agents:
+            self.pandas_agents[resolved_model] = PandasAgent(
+                self.llm_service.get_llm(resolved_model, require_chat=True)
+            )
+        return self.pandas_agents[resolved_model]
     
     async def _handle_report_generation(
         self,
         query: str,
         connection_id: Optional[str],
-        context: Optional[Dict[str, Any]]
+        context: Optional[Dict[str, Any]],
+        model_id: Optional[str] = None
     ) -> Dict[str, Any]:
         """Handle report generation requests"""
         
@@ -491,14 +576,16 @@ class AgentOrchestrator:
             report = await self.report_tool.generate_report(
                 query,
                 context.get("data") if context else None,
-                context.get("analysis_results") if context else None
+                context.get("analysis_results") if context else None,
+                model_id=model_id
             )
             
             return {
                 "query": query,
                 "intent": {"type": "report_generation"},
                 "response": "Report generated successfully",
-                "report": report
+                "report": report,
+                "model": model_id
             }
         except Exception as e:
             logger.error(f"Error generating report: {str(e)}")
@@ -506,10 +593,11 @@ class AgentOrchestrator:
                 "query": query,
                 "intent": {"type": "report_generation"},
                 "response": f"Failed to generate report: {str(e)}",
-                "error": str(e)
+                "error": str(e),
+                "model": model_id
             }
     
-    async def _handle_general_query(self, query: str, database_context: Optional[str]) -> str:
+    async def _handle_general_query(self, query: str, database_context: Optional[str], model_id: Optional[str] = None) -> str:
         """Handle general queries"""
         
         prompt = query
@@ -528,9 +616,9 @@ class AgentOrchestrator:
             Be friendly, clear, and focus on helping the user understand their options.
             """
         
-        return await self.llm_service.generate_response(prompt)
+        return await self.llm_service.generate_response(prompt, model_id=model_id)
     
-    async def _analyze_intent(self, query: str, database_context: Optional[str] = None) -> Dict[str, Any]:
+    async def _analyze_intent(self, query: str, database_context: Optional[str] = None, model_id: Optional[str] = None) -> Dict[str, Any]:
         """Analyze user query to determine intent and required tools"""
         
         try:
@@ -570,7 +658,8 @@ class AgentOrchestrator:
             
             response = await self.llm_service.generate_response(
                 prompt, 
-                response_format="json"
+                response_format="json",
+                model_id=model_id
             )
             
             return response

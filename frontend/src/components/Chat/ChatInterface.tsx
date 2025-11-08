@@ -37,6 +37,7 @@ import ChatSessionsControls from './ChatSessionsControls';
 import SingleChartWithActions from '../Analysis/SingleChartWithActions';
 import { useSelector } from 'react-redux';
 import { RootState } from '../../store';
+import ModelSelector from './ModelSelector';
 
 const ChatInterface: React.FC = () => {
   const { messages, isLoading, sendMessage, currentAnalysis, clearMessages, stopGeneration } = useChat();
@@ -201,6 +202,7 @@ const ChatInterface: React.FC = () => {
               </Box>
               
               <Box display="flex" alignItems="center" gap={1}>
+                <ModelSelector />
                 {/* Chat sessions controls */}
                 <ChatSessionsControls />
 

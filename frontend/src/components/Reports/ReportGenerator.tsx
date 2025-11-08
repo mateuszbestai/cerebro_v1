@@ -20,6 +20,7 @@ import {
 import { apiClient } from '../../services/api';
 import { useSelector } from 'react-redux';
 import { RootState } from '../../store';
+import { useModelOptions } from '../../contexts/ModelContext';
 
 interface ReportGeneratorProps {
   open: boolean;
@@ -31,6 +32,7 @@ const POLL_INTERVAL_MS = 1500;
 
 const ReportGenerator: React.FC<ReportGeneratorProps> = ({ open, onClose, onGenerated }) => {
   const latestAnalysis = useSelector((state: RootState) => state.analysis.history[0]);
+  const { selectedModel } = useModelOptions();
 
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -66,6 +68,9 @@ const ReportGenerator: React.FC<ReportGeneratorProps> = ({ open, onClose, onGene
         format,
         include_charts: includeCharts,
       };
+      if (selectedModel?.id) {
+        payload.model = selectedModel.id;
+      }
 
       if (latestAnalysis) {
         payload.analysis_results = latestAnalysis;

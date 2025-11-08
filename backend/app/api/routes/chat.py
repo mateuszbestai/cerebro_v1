@@ -6,6 +6,7 @@ import asyncio
 import logging
 
 from app.utils.logger import setup_logger
+from app.services.azure_openai import AzureOpenAIService
 
 router = APIRouter()
 logger = setup_logger(__name__)
@@ -14,6 +15,7 @@ logger = setup_logger(__name__)
 class ChatMessage(BaseModel):
     message: str
     context: Optional[Dict[str, Any]] = None
+    model: Optional[str] = None
 
 class ChatResponse(BaseModel):
     response: str
@@ -86,9 +88,13 @@ async def send_message(chat_message: ChatMessage):
         orchestrator = get_orchestrator()
         
         # Process the message through the orchestrator
+        context = dict(chat_message.context or {})
+        if chat_message.model:
+            context["model"] = chat_message.model
+        
         result = await orchestrator.process_query(
             chat_message.message,
-            chat_message.context
+            context
         )
         
         # Build response
@@ -103,7 +109,8 @@ async def send_message(chat_message: ChatMessage):
                 "sql_query": result.get("sql_query"),
                 "columns": result.get("columns"),
                 "row_count": result.get("row_count")
-            }
+            },
+            model=result.get("model")
         )
         
         # Add error if present
@@ -151,9 +158,13 @@ async def websocket_endpoint(websocket: WebSocket):
             message_data = json.loads(data)
             
             # Process message
+            msg_context = dict(message_data.get("context") or {})
+            if message_data.get("model"):
+                msg_context["model"] = message_data["model"]
+            
             result = await orchestrator.process_query(
                 message_data["message"],
-                message_data.get("context")
+                msg_context
             )
             
             # Send response back
@@ -167,3 +178,12 @@ async def websocket_endpoint(websocket: WebSocket):
     except Exception as e:
         logger.error(f"WebSocket error: {str(e)}")
         manager.disconnect(websocket)
+@router.get("/models")
+async def get_available_models():
+    """Expose configured Azure OpenAI deployments"""
+    service = AzureOpenAIService()
+    models = service.get_available_models()
+    return {
+        "models": models,
+        "default_model": service.default_model_id
+    }

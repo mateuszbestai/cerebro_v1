@@ -52,6 +52,7 @@ AZURE_SQL_PASSWORD=your-password
 AZURE_OPENAI_API_KEY=your-api-key
 AZURE_OPENAI_ENDPOINT=https://your-resource.openai.azure.com/
 AZURE_OPENAI_DEPLOYMENT_NAME=gpt-4
+AZURE_OPENAI_API_VERSION=2024-02-15-preview
 
 # Redis
 REDIS_URL=redis://localhost:6379
@@ -63,9 +64,15 @@ LOG_LEVEL=INFO
 
 **Frontend `.env`:**
 ```env
-REACT_APP_API_URL=http://localhost:8000/api/v1
-REACT_APP_WS_URL=ws://localhost:8000/ws
+VITE_API_URL=/api/v1
+VITE_WS_URL=
+VITE_DEV_PROXY_TARGET=http://localhost:8000
+# VITE_DEV_PROXY_WS_TARGET=ws://localhost:8000
 ```
+
+`VITE_DEV_PROXY_TARGET` is only used by `npm run dev` so set it to the FastAPI host you want to proxy to (e.g., `http://backend:8000` when using Docker networking or `http://localhost:8000` for local stack).
+
+> **Docker Compose tip:** The backend service now loads `backend/.env` directly (via `env_file`). Populate that file before running `docker compose up` so the container actually receives your Azure SQL/OpenAI credentials. Compose still overrides `REDIS_URL` to `redis://redis:6379`, so you can keep the local value pointing at `localhost` for non-docker workflows.
 
 ### 3. Docker Deployment (Recommended)
 

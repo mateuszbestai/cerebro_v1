@@ -1,4 +1,5 @@
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic import Field, AliasChoices
 from typing import List, Optional
 import os
 import platform
@@ -11,6 +12,12 @@ logger = logging.getLogger(__name__)
 
 class Settings(BaseSettings):
     """Application settings with improved error handling"""
+    
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        case_sensitive=True,
+        extra="ignore",
+    )
     
     # API Configuration
     API_V1_STR: str = "/api/v1"
@@ -25,8 +32,16 @@ class Settings(BaseSettings):
     # Azure OpenAI (with defaults)
     AZURE_OPENAI_API_KEY: str = os.getenv("AZURE_OPENAI_API_KEY", "")
     AZURE_OPENAI_ENDPOINT: str = os.getenv("AZURE_OPENAI_ENDPOINT", "")
-    AZURE_OPENAI_DEPLOYMENT_NAME: str = os.getenv("AZURE_OPENAI_DEPLOYMENT_NAME", "gpt-4")
-    AZURE_OPENAI_API_VERSION: str = "2024-02-15-preview"
+    AZURE_OPENAI_DEPLOYMENT_NAME: str = os.getenv("AZURE_OPENAI_DEPLOYMENT_NAME", "gpt-4o")
+    AZURE_OPENAI_CHAT_MODEL_NAME: str = os.getenv("AZURE_OPENAI_CHAT_MODEL_NAME", "gpt-4.1")
+    AZURE_OPENAI_API_VERSION: str = Field(
+        default="2024-02-15-preview",
+        validation_alias=AliasChoices("AZURE_OPENAI_API_VERSION", "api_version"),
+    )
+    AZURE_OPENAI_COMPLETION_DEPLOYMENT_NAME: str = os.getenv("AZURE_OPENAI_COMPLETION_DEPLOYMENT_NAME", "")
+    AZURE_OPENAI_COMPLETION_MODEL_NAME: str = os.getenv("AZURE_OPENAI_COMPLETION_MODEL_NAME", "gpt-5")
+    AZURE_OPENAI_COMPLETION_API_VERSION: str = os.getenv("AZURE_OPENAI_COMPLETION_API_VERSION", "2024-12-01-preview")
+    AZURE_OPENAI_COMPLETION_ENDPOINT: str = os.getenv("AZURE_OPENAI_COMPLETION_ENDPOINT", "")
     
     # CORS
     ALLOWED_ORIGINS: List[str] = [
@@ -234,10 +249,6 @@ class Settings(BaseSettings):
         """Check if OpenAI configuration is available"""
         return bool(self.AZURE_OPENAI_API_KEY and self.AZURE_OPENAI_ENDPOINT)
     
-    class Config:
-        env_file = ".env"
-        case_sensitive = True
-
 settings = Settings()
 
 # Log configuration status on startup
