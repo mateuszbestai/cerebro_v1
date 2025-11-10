@@ -43,6 +43,7 @@ import {
 } from '@mui/icons-material';
 import { databaseApi } from '../../services/databaseApi';
 import { useDatabase } from '../../contexts/DatabaseContext';
+import { alpha, useTheme } from '@mui/material/styles';
 
 interface TableInfo {
   name: string;
@@ -79,6 +80,7 @@ const TablesDashboard: React.FC = () => {
     refreshTables,
     isConnected
   } = useDatabase();
+  const theme = useTheme();
   const [tables, setTables] = useState<TableInfo[]>([]);
   const [filteredTables, setFilteredTables] = useState<TableInfo[]>([]);
   const [loading, setLoading] = useState(false);
@@ -262,8 +264,16 @@ const TablesDashboard: React.FC = () => {
         </Grid>
 
         {selectedTables.length > 0 && (
-          <Box sx={{ mt: 2, p: 2, bgcolor: 'primary.light', borderRadius: 1 }}>
-            <Typography variant="body2" sx={{ color: 'white' }}>
+          <Box
+            sx={{
+              mt: 2,
+              p: 2,
+              bgcolor: alpha(theme.palette.primary.main, theme.palette.mode === 'dark' ? 0.2 : 0.08),
+              borderRadius: 1,
+              border: `1px solid ${alpha(theme.palette.primary.main, 0.35)}`,
+            }}
+          >
+            <Typography variant="body2">
               Selected tables for analysis: {selectedTables.join(', ')}
             </Typography>
           </Box>

@@ -18,6 +18,7 @@ import {
 } from '@mui/icons-material';
 import ReactMarkdown from 'react-markdown';
 import { Message as MessageType } from '../../types';
+import { alpha, useTheme } from '@mui/material/styles';
 
 interface MessageProps {
   message: MessageType;
@@ -25,6 +26,16 @@ interface MessageProps {
 
 const Message: React.FC<MessageProps> = ({ message }) => {
   const isUser = message.role === 'user';
+  const theme = useTheme();
+
+  const bubbleBackground = isUser
+    ? alpha(theme.palette.primary.main, theme.palette.mode === 'dark' ? 0.24 : 0.12)
+    : theme.palette.mode === 'dark'
+      ? alpha(theme.palette.common.white, 0.04)
+      : theme.palette.background.paper;
+  const bubbleBorder = isUser
+    ? `1px solid ${alpha(theme.palette.primary.main, 0.45)}`
+    : `1px solid ${alpha(theme.palette.divider, theme.palette.mode === 'dark' ? 0.6 : 1)}`;
   
   const handleCopy = () => {
     navigator.clipboard.writeText(message.content);
@@ -69,10 +80,11 @@ const Message: React.FC<MessageProps> = ({ message }) => {
           elevation={1}
           sx={{
             p: 2,
-            backgroundColor: isUser ? 'primary.light' : 'white',
-            color: isUser ? 'white' : 'text.primary',
+            backgroundColor: bubbleBackground,
+            color: theme.palette.text.primary,
             borderRadius: 2,
             position: 'relative',
+            border: bubbleBorder,
             '&:hover .message-actions': {
               opacity: 1,
             },

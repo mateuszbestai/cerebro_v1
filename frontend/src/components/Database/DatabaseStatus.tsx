@@ -20,6 +20,7 @@ import {
   Close as CloseIcon,
 } from '@mui/icons-material';
 import { useDatabase } from '../../contexts/DatabaseContext';
+import { alpha, useTheme } from '@mui/material/styles';
 
 interface DatabaseStatusProps {
   onConnect: () => void;
@@ -36,6 +37,7 @@ const DatabaseStatus: React.FC<DatabaseStatusProps> = ({ onConnect }) => {
     disconnect,
     refreshTables 
   } = useDatabase();
+  const theme = useTheme();
   
   const [showDetails, setShowDetails] = React.useState(false);
 
@@ -98,6 +100,16 @@ const DatabaseStatus: React.FC<DatabaseStatusProps> = ({ onConnect }) => {
     );
   }
 
+  const actionIconStyles = {
+    bgcolor: alpha(theme.palette.primary.main, theme.palette.mode === 'dark' ? 0.18 : 0.08),
+    color: theme.palette.primary.main,
+    border: `1px solid ${alpha(theme.palette.primary.main, 0.35)}`,
+    transition: 'background-color 0.2s ease',
+    '&:hover': {
+      bgcolor: alpha(theme.palette.primary.main, theme.palette.mode === 'dark' ? 0.25 : 0.15),
+    },
+  };
+
   return (
     <Paper 
       elevation={0} 
@@ -150,7 +162,11 @@ const DatabaseStatus: React.FC<DatabaseStatusProps> = ({ onConnect }) => {
         <Box display="flex" alignItems="center" gap={1}>
           {/* Show Details Button */}
           <Tooltip title="Show Details">
-            <IconButton size="small" onClick={() => setShowDetails(!showDetails)}>
+            <IconButton
+              size="small"
+              onClick={() => setShowDetails(!showDetails)}
+              sx={actionIconStyles}
+            >
               <InfoIcon />
             </IconButton>
           </Tooltip>
@@ -158,7 +174,11 @@ const DatabaseStatus: React.FC<DatabaseStatusProps> = ({ onConnect }) => {
           {/* Refresh Button */}
           {isConnected && (
             <Tooltip title="Refresh Tables">
-              <IconButton size="small" onClick={refreshTables}>
+              <IconButton
+                size="small"
+                onClick={refreshTables}
+                sx={actionIconStyles}
+              >
                 <RefreshIcon />
               </IconButton>
             </Tooltip>

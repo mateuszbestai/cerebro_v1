@@ -38,6 +38,7 @@ import SingleChartWithActions from '../Analysis/SingleChartWithActions';
 import { useSelector } from 'react-redux';
 import { RootState } from '../../store';
 import ModelSelector from './ModelSelector';
+import { alpha, useTheme } from '@mui/material/styles';
 
 const ChatInterface: React.FC = () => {
   const { messages, isLoading, sendMessage, currentAnalysis, clearMessages, stopGeneration } = useChat();
@@ -48,12 +49,14 @@ const ChatInterface: React.FC = () => {
     tables,
     getTableContext 
   } = useDatabase();
+  const theme = useTheme();
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [showDatabaseContext, setShowDatabaseContext] = useState(false);
   const [showAnalysisPanel, setShowAnalysisPanel] = useState(true);
   const [historyOpen, setHistoryOpen] = useState(false);
   const history = useSelector((state: RootState) => state.analysis.history);
+  const hasAnalysisPanel = Boolean(showAnalysisPanel && currentAnalysis);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -85,7 +88,12 @@ const ChatInterface: React.FC = () => {
   };
 
   return (
-    <Container maxWidth="xl">
+    <Container 
+      maxWidth={false}
+      sx={{
+        px: { xs: 0, sm: 1 },
+      }}
+    >
       {/* Database Context Bar */}
       {isConnected && (
         <Paper 
@@ -136,7 +144,15 @@ const ChatInterface: React.FC = () => {
 
           {/* Expandable Database Context */}
           <Collapse in={showDatabaseContext}>
-            <Box sx={{ mt: 2, p: 2, bgcolor: 'grey.50', borderRadius: 1 }}>
+            <Box
+              sx={{
+                mt: 2,
+                p: 2,
+                bgcolor: alpha(theme.palette.primary.main, theme.palette.mode === 'dark' ? 0.1 : 0.04),
+                borderRadius: 1,
+                border: `1px solid ${alpha(theme.palette.primary.main, 0.2)}`,
+              }}
+            >
               <Typography variant="subtitle2" gutterBottom>
                 Database Context for AI:
               </Typography>
@@ -177,16 +193,27 @@ const ChatInterface: React.FC = () => {
         </Alert>
       )}
 
-      <Box sx={{ display: 'flex', gap: 2, height: 'calc(100vh - 200px)' }}>
+      <Box
+        sx={{
+          display: 'grid',
+          gap: { xs: 2, md: 3 },
+          gridTemplateColumns: hasAnalysisPanel
+            ? { xs: '1fr', lg: 'minmax(0, 1.15fr) minmax(0, 0.85fr)' }
+            : '1fr',
+          alignItems: 'stretch',
+          height: { xs: 'auto', lg: 'calc(100vh - 140px)' },
+          minHeight: { lg: 620 },
+        }}
+      >
         {/* Chat Section */}
         <Paper
           elevation={3}
           sx={{
-            flex: showAnalysisPanel && currentAnalysis ? 1 : 2,
             display: 'flex',
             flexDirection: 'column',
             overflow: 'hidden',
-            transition: 'flex 0.3s ease',
+            height: '100%',
+            minHeight: { xs: 420, lg: 'auto' },
           }}
         >
           <Box sx={{ p: 2, borderBottom: '1px solid #e0e0e0' }}>
@@ -277,14 +304,15 @@ const ChatInterface: React.FC = () => {
         </Paper>
 
         {/* Results Section */}
-        {showAnalysisPanel && currentAnalysis && (
+        {hasAnalysisPanel && (
           <Paper
             elevation={3}
             sx={{
-              width: '50%',
               display: 'flex',
               flexDirection: 'column',
               overflow: 'hidden',
+              height: '100%',
+              minHeight: { xs: 400, lg: 'auto' },
             }}
           >
             <Box sx={{ p: 2, borderBottom: '1px solid #e0e0e0' }}>
