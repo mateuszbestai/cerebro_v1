@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 import logging
 
-from app.api.routes import chat, analysis, reports, database
+from app.api.routes import chat, analysis, reports, database, gdm
 from app.config import settings
 from app.utils.logger import setup_logger
 
@@ -56,6 +56,7 @@ app.include_router(chat.router, prefix="/api/v1/chat", tags=["chat"])
 app.include_router(database.router, prefix="/api/v1/database", tags=["database"])
 app.include_router(analysis.router, prefix="/api/v1/analysis", tags=["analysis"])
 app.include_router(reports.router, prefix="/api/v1/reports", tags=["reports"])
+app.include_router(gdm.router, prefix="/api/v1/gdm", tags=["gdm"])
 
 @app.get("/")
 async def root():

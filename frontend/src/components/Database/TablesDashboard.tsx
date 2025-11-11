@@ -44,6 +44,7 @@ import {
 import { databaseApi } from '../../services/databaseApi';
 import { useDatabase } from '../../contexts/DatabaseContext';
 import { alpha, useTheme } from '@mui/material/styles';
+import CreateGDMButton from './CreateGDMButton';
 
 interface TableInfo {
   name: string;
@@ -224,6 +225,11 @@ const TablesDashboard: React.FC = () => {
           </Grid>
         </Paper>
       )}
+
+      {/* Global Data Model */}
+      <Paper sx={{ p: 2, mb: 3 }}>
+        <CreateGDMButton dbId={connectionId} />
+      </Paper>
 
       {/* Search and Actions */}
       <Paper sx={{ p: 2, mb: 3 }}>

@@ -6,10 +6,14 @@ from app.services.azure_openai import AzureOpenAIService
 from app.services.langchain_service import LangChainService
 from app.services.chart_service import ChartService
 from app.services.report_service import ReportService
+from app.services.gdm_service import GDMService, gdm_service, GDMJob
 
 __all__ = [
     "AzureOpenAIService",
     "LangChainService",
     "ChartService",
-    "ReportService"
+    "ReportService",
+    "GDMService",
+    "GDMJob",
+    "gdm_service",
 ]
