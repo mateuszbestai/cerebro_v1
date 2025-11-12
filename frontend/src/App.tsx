@@ -4,6 +4,7 @@ import { ThemeProvider, createTheme } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
 import { Provider } from 'react-redux';
 import { store } from './store';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 // Components
 import Layout from './components/Common/Layout';
@@ -15,6 +16,7 @@ import DatabaseStatus from './components/Database/DatabaseStatus.tsx';
 import VisualizationsDashboard from './components/Visualizations/VisualizationsDashboard';
 import SolutionsHub from './pages/SolutionsHub';
 import RealTimePreview from './pages/RealTimePreview';
+import GDMResults from './pages/GDMResults';
 
 // Contexts
 import { DatabaseProvider } from './contexts/DatabaseContext';
@@ -67,6 +69,7 @@ function AppContent() {
         <Route path="/" element={<SolutionsHub />} />
         <Route path="/solutions/db" element={<ChatInterface />} />
         <Route path="/solutions/realtime" element={<RealTimePreview />} />
+        <Route path="/solutions/gdm/:jobId/results" element={<GDMResults />} />
         <Route path="/database" element={<TablesDashboard />} />
         <Route path="/reports" element={<ReportViewer />} />
         <Route path="/visualizations" element={<VisualizationsDashboard />} />
@@ -216,12 +219,23 @@ function AppWithTheme() {
   );
 }
 
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: 2,
+      refetchOnWindowFocus: false,
+    },
+  },
+});
+
 function App() {
   return (
     <Provider store={store}>
-      <ThemeModeProvider>
-        <AppWithTheme />
-      </ThemeModeProvider>
+      <QueryClientProvider client={queryClient}>
+        <ThemeModeProvider>
+          <AppWithTheme />
+        </ThemeModeProvider>
+      </QueryClientProvider>
     </Provider>
   );
 }

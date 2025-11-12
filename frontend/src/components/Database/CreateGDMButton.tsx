@@ -22,6 +22,7 @@ import {
 } from '@mui/material';
 import { Bolt, CheckCircleOutline, InfoOutlined, PlayArrow, SaveAltOutlined, TimerOutlined } from '@mui/icons-material';
 import { gdmApi, GDMArtifact, GDMStatusResponse } from '../../services/gdmApi';
+import { Link as RouterLink } from 'react-router-dom';
 
 type ModelOption = 'gpt-5' | 'gpt-4.1';
 
@@ -311,6 +312,15 @@ const CreateGDMButton: React.FC<CreateGDMButtonProps> = ({ dbId }) => {
                 </Alert>
               )}
               {renderArtifacts()}
+              <Button
+                component={RouterLink}
+                to={`/solutions/gdm/${status.job_id}/results`}
+                variant="contained"
+                color="secondary"
+                sx={{ mt: 2 }}
+              >
+                Open Global Model Results
+              </Button>
             </>
           )}
         </Box>

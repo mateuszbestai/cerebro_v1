@@ -6,7 +6,7 @@ COPY package*.json ./
 # Use npm install to allow lockfile updates during build (we pin via package-lock in repo when available)
 RUN npm install
 COPY . .
-ENV NODE_OPTIONS=--max-old-space-size=4096
+ENV NODE_OPTIONS=--max-old-space-size=8192
 RUN npm run build
 
 # Production stage - serve the built files with a static server
