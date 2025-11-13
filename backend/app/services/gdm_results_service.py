@@ -548,6 +548,8 @@ class GDMResultsService:
                     parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
                 except ValueError:
                     continue
+                if parsed.tzinfo is None:
+                    parsed = parsed.replace(tzinfo=timezone.utc)
                 if not latest or parsed > latest:
                     latest = parsed
                     table = table_id
