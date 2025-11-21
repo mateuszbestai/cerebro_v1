@@ -108,7 +108,7 @@ const Sidebar: React.FC<SidebarProps> = ({ open, onClose, variant = 'permanent' 
   const getNavigationVariant = (): NavigationVariant => {
     if (location.pathname === '/') return 'solutionsHub';
 
-    const databaseAssistantPaths = ['/solutions/db', '/database', '/reports', '/visualizations'];
+    const databaseAssistantPaths = ['/solutions/db', '/solutions/gdm', '/database', '/reports', '/visualizations'];
     const isDatabaseAssistantRoute = databaseAssistantPaths.some(
       (path) =>
         location.pathname === path || location.pathname.startsWith(`${path}/`),

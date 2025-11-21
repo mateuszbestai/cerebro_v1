@@ -11,7 +11,7 @@ import {
   Stack,
   Typography,
 } from '@mui/material';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
 import ArtifactTabs from '../components/GDM/ArtifactTabs';
 import GraphPanel from '../components/GDM/GraphPanel';
@@ -26,6 +26,7 @@ import {
   GDMInsight,
   GDMTimelineItem,
 } from '../services/gdmApi';
+import { saveLastGdmJob } from '../utils/gdmStorage';
 
 const DEFAULT_ARTIFACT = 'global_model.json';
 
@@ -154,6 +155,17 @@ const GDMResults: React.FC = () => {
   const summary = summaryQuery.data;
   const insights = insightsQuery.data;
   const timeline: GDMTimelineItem[] = results?.timeline ?? [];
+
+  useEffect(() => {
+    if (results?.job_id) {
+      saveLastGdmJob({
+        jobId: results.job_id,
+        databaseId: results.database_id,
+        completedAt: results.completed_at,
+        modelUsed: results.model_used,
+      });
+    }
+  }, [results?.job_id, results?.database_id, results?.completed_at, results?.model_used]);
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 4 }}>

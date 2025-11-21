@@ -23,6 +23,7 @@ import {
 import { Bolt, CheckCircleOutline, InfoOutlined, PlayArrow, SaveAltOutlined, TimerOutlined } from '@mui/icons-material';
 import { gdmApi, GDMArtifact, GDMStatusResponse } from '../../services/gdmApi';
 import { Link as RouterLink } from 'react-router-dom';
+import { loadLastGdmJob, saveLastGdmJob, LastGdmJobMetadata } from '../../utils/gdmStorage';
 
 type ModelOption = 'gpt-5' | 'gpt-4.1';
 
@@ -44,6 +45,15 @@ const modelDescriptions: Record<ModelOption, { title: string; subtitle: string; 
 };
 
 const DEFAULT_POLL_INTERVAL = 3500;
+
+const formatTimestamp = (timestamp?: string | null) => {
+  if (!timestamp) return null;
+  const date = new Date(timestamp);
+  if (Number.isNaN(date.getTime())) {
+    return null;
+  }
+  return date.toLocaleString();
+};
 
 const pipelineSteps: Record<
   string,
@@ -71,6 +81,7 @@ const CreateGDMButton: React.FC<CreateGDMButtonProps> = ({ dbId }) => {
   const [warnings, setWarnings] = useState<string[]>([]);
   const [isSubmitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [savedJob, setSavedJob] = useState<LastGdmJobMetadata | null>(() => loadLastGdmJob());
 
   const isRunning = status ? status.status === 'running' : false;
   const buttonDisabled = !dbId || isSubmitting || isRunning;
@@ -110,6 +121,20 @@ const CreateGDMButton: React.FC<CreateGDMButtonProps> = ({ dbId }) => {
       }
     };
   }, [jobId]);
+
+  useEffect(() => {
+    if (!status || status.status !== 'completed') {
+      return;
+    }
+    const metadata: LastGdmJobMetadata = {
+      jobId: status.job_id,
+      databaseId: dbId || savedJob?.databaseId || null,
+      completedAt: status.completed_at,
+      modelUsed: status.model_used,
+    };
+    saveLastGdmJob(metadata);
+    setSavedJob(metadata);
+  }, [status?.status, status?.job_id, status?.completed_at, status?.model_used, dbId, savedJob?.databaseId]);
 
   const startJob = async () => {
     if (!dbId) return;
@@ -162,6 +187,7 @@ const CreateGDMButton: React.FC<CreateGDMButtonProps> = ({ dbId }) => {
     return prioritized;
   }, [status]);
 
+  const savedJobCompletedAt = savedJob?.completedAt ? formatTimestamp(savedJob.completedAt) : null;
   const renderArtifacts = () => {
     if (!status?.artifacts || status.artifacts.length === 0) {
       return null;
@@ -193,6 +219,34 @@ const CreateGDMButton: React.FC<CreateGDMButtonProps> = ({ dbId }) => {
 
   return (
     <Box>
+      {savedJob?.jobId && (
+        <Alert
+          severity="info"
+          sx={{
+            mb: 2,
+            '& .MuiAlert-message': { width: '100%' },
+          }}
+        >
+          <Stack direction="row" spacing={2} alignItems="center" justifyContent="space-between" flexWrap="wrap">
+            <Box sx={{ flex: 1, minWidth: 220 }}>
+              <Typography variant="subtitle2">Latest global data model is ready</Typography>
+              <Typography variant="body2" color="text.secondary">
+                Job {savedJob.jobId}
+                {savedJobCompletedAt ? ` · Completed ${savedJobCompletedAt}` : ''}
+              </Typography>
+            </Box>
+            <Button
+              component={RouterLink}
+              to={`/solutions/gdm/${savedJob.jobId}/results`}
+              variant="outlined"
+              color="primary"
+              size="small"
+            >
+              Return to GDM results
+            </Button>
+          </Stack>
+        </Alert>
+      )}
       <Tooltip title={!dbId ? 'Connect to a database to enable GDM generation' : ''}>
         <span>
           <Button
