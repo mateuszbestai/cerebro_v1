@@ -39,6 +39,7 @@ import { useSelector } from 'react-redux';
 import { RootState } from '../../store';
 import ModelSelector from './ModelSelector';
 import { alpha, useTheme } from '@mui/material/styles';
+import PlaybookRunner from '../Playbooks/PlaybookRunner';
 
 const ChatInterface: React.FC = () => {
   const { messages, isLoading, sendMessage, currentAnalysis, clearMessages, stopGeneration } = useChat();
@@ -230,6 +231,7 @@ const ChatInterface: React.FC = () => {
               
               <Box display="flex" alignItems="center" gap={1}>
                 <ModelSelector />
+                <PlaybookRunner compact />
                 {/* Chat sessions controls */}
                 <ChatSessionsControls />
 

@@ -59,3 +59,25 @@ export interface AnalysisResult {
     isAnalyzing: boolean;
     error?: string;
   }
+
+export interface Playbook {
+  id: string;
+  name: string;
+  description: string;
+  domain?: string;
+  required_inputs?: string[];
+  steps?: string[];
+}
+
+export interface PlaybookRunParams {
+  playbook_id: string;
+  params: Record<string, any>;
+}
+
+export interface AutoMLJobStatus {
+  status: string;
+  job_id: string;
+  metrics?: Record<string, any>;
+  summary?: string;
+  error?: string;
+}

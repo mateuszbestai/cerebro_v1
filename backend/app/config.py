@@ -42,6 +42,18 @@ class Settings(BaseSettings):
     AZURE_OPENAI_COMPLETION_MODEL_NAME: str = os.getenv("AZURE_OPENAI_COMPLETION_MODEL_NAME", "gpt-5")
     AZURE_OPENAI_COMPLETION_API_VERSION: str = os.getenv("AZURE_OPENAI_COMPLETION_API_VERSION", "2024-12-01-preview")
     AZURE_OPENAI_COMPLETION_ENDPOINT: str = os.getenv("AZURE_OPENAI_COMPLETION_ENDPOINT", "")
+
+    # Azure ML (AutoML)
+    AZURE_ML_SUBSCRIPTION_ID: str = os.getenv("AZURE_ML_SUBSCRIPTION_ID", "")
+    AZURE_ML_RESOURCE_GROUP: str = os.getenv("AZURE_ML_RESOURCE_GROUP", "")
+    AZURE_ML_WORKSPACE_NAME: str = os.getenv("AZURE_ML_WORKSPACE_NAME", "")
+    AZURE_ML_COMPUTE_NAME: str = os.getenv("AZURE_ML_COMPUTE_NAME", "")
+    AZURE_ML_EXPERIMENT_PREFIX: str = os.getenv("AZURE_ML_EXPERIMENT_PREFIX", "cerebro-automl")
+    AZURE_ML_DATASTORE: str = os.getenv("AZURE_ML_DATASTORE", "")
+    AZURE_ML_STORAGE_ACCOUNT: str = os.getenv("AZURE_ML_STORAGE_ACCOUNT", "")
+    AZURE_ML_TENANT_ID: str = os.getenv("AZURE_ML_TENANT_ID", "")
+    AZURE_ML_CLIENT_ID: str = os.getenv("AZURE_ML_CLIENT_ID", "")
+    AZURE_ML_CLIENT_SECRET: str = os.getenv("AZURE_ML_CLIENT_SECRET", "")
     
     # CORS
     ALLOWED_ORIGINS: List[str] = [
@@ -248,6 +260,16 @@ class Settings(BaseSettings):
     def has_openai_config(self) -> bool:
         """Check if OpenAI configuration is available"""
         return bool(self.AZURE_OPENAI_API_KEY and self.AZURE_OPENAI_ENDPOINT)
+
+    @property
+    def has_azure_ml_config(self) -> bool:
+        """Check if Azure ML configuration is available"""
+        required = [
+            self.AZURE_ML_SUBSCRIPTION_ID,
+            self.AZURE_ML_RESOURCE_GROUP,
+            self.AZURE_ML_WORKSPACE_NAME,
+        ]
+        return all(required)
     
 settings = Settings()
 
@@ -256,3 +278,5 @@ if not settings.has_sql_config:
     logger.warning("SQL Database configuration is missing or incomplete")
 if not settings.has_openai_config:
     logger.warning("Azure OpenAI configuration is missing or incomplete")
+if not settings.has_azure_ml_config:
+    logger.warning("Azure ML configuration is missing or incomplete (AutoML features will be limited)")

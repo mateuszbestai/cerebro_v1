@@ -1,4 +1,5 @@
 import axios, { AxiosInstance } from 'axios';
+import { AutoMLJobStatus, Playbook } from '../types';
 
 const API_BASE_URL: string = (import.meta.env.VITE_API_URL as string) || '/api/v1';
 const WS_BASE_URL: string = (import.meta.env.VITE_WS_URL as string) || (
@@ -73,6 +74,19 @@ interface ReportResponse {
   status: string;
   created_at: string;
   url?: string;
+  error?: string;
+}
+
+interface PlaybookRunRequest {
+  playbook_id: string;
+  params: Record<string, any>;
+}
+
+interface PlaybookRunResponse {
+  status: string;
+  job_id?: string;
+  playbook_id?: string;
+  summary?: string;
   error?: string;
 }
 
@@ -281,6 +295,22 @@ class ApiClient {
     return response.data;
   }
 
+  // Playbooks + AutoML
+  async listPlaybooks(): Promise<Playbook[]> {
+    const response = await this.axiosInstance.get<Playbook[]>('/playbooks');
+    return response.data;
+  }
+
+  async runPlaybook(request: PlaybookRunRequest): Promise<PlaybookRunResponse> {
+    const response = await this.axiosInstance.post<PlaybookRunResponse>('/playbooks/run', request);
+    return response.data;
+  }
+
+  async getAutomlJob(jobId: string): Promise<AutoMLJobStatus> {
+    const response = await this.axiosInstance.get<AutoMLJobStatus>(`/automl/${jobId}`);
+    return response.data;
+  }
+
   // Utility methods
   setAuthToken(token: string): void {
     localStorage.setItem('auth_token', token);
@@ -306,5 +336,7 @@ export type {
   AnalysisRequest, 
   AnalysisResponse, 
   ReportRequest, 
-  ReportResponse 
+  ReportResponse,
+  PlaybookRunRequest,
+  PlaybookRunResponse,
 };
