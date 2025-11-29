@@ -90,6 +90,35 @@ interface PlaybookRunResponse {
   error?: string;
 }
 
+export interface GeneratePlaybookFromGdmRequest {
+  job_id: string;
+  use_case: string;
+  task?: string;
+  target_table?: string;
+  target_column?: string;
+  metric?: string;
+  time_limit_minutes?: number;
+  max_trials?: number;
+}
+
+export interface GeneratedPlaybookSummary {
+  id: string;
+  name: string;
+  description?: string;
+  domain?: string;
+  required_inputs?: string[];
+  steps?: string[];
+  from_gdm_job?: string;
+  defaults?: {
+    target_column?: string;
+    target_table?: string;
+    metric?: string;
+    time_limit_minutes?: number;
+    max_trials?: number;
+    task?: string;
+  };
+}
+
 class ApiClient {
   private axiosInstance: AxiosInstance;
   private wsConnection: WebSocket | null = null;
@@ -306,6 +335,11 @@ class ApiClient {
     return response.data;
   }
 
+  async generatePlaybookFromGdm(request: GeneratePlaybookFromGdmRequest): Promise<GeneratedPlaybookSummary> {
+    const response = await this.axiosInstance.post<GeneratedPlaybookSummary>('/playbooks/generate', request);
+    return response.data;
+  }
+
   async getAutomlJob(jobId: string): Promise<AutoMLJobStatus> {
     const response = await this.axiosInstance.get<AutoMLJobStatus>(`/automl/${jobId}`);
     return response.data;
@@ -338,5 +372,5 @@ export type {
   ReportRequest, 
   ReportResponse,
   PlaybookRunRequest,
-  PlaybookRunResponse,
+  PlaybookRunResponse
 };

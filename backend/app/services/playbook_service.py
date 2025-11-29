@@ -20,6 +20,7 @@ class PlaybookService:
         self._load_playbooks()
 
     def _load_playbooks(self) -> None:
+        self._playbooks_cache = {}
         if not self.playbook_dir.exists():
             logger.warning("Playbook directory not found: %s", self.playbook_dir)
             return
@@ -41,12 +42,31 @@ class PlaybookService:
                 "domain": pb.get("domain"),
                 "required_inputs": pb.get("required_inputs", []),
                 "steps": [s.get("type") for s in pb.get("steps", [])],
+                "defaults": self._extract_defaults(pb),
             }
             for pb in self._playbooks_cache.values()
         ]
 
     def get_playbook(self, playbook_id: str) -> Optional[Dict[str, Any]]:
         return self._playbooks_cache.get(playbook_id)
+
+    def save_playbook(self, playbook: Dict[str, Any]) -> Dict[str, Any]:
+        """Persist a playbook to disk and refresh the registry."""
+        playbook_id = playbook.get("id")
+        if not playbook_id:
+            raise ValueError("Playbook is missing an 'id' field")
+
+        self.playbook_dir.mkdir(parents=True, exist_ok=True)
+        path = self.playbook_dir / f"{playbook_id}.yaml"
+        try:
+            with open(path, "w", encoding="utf-8") as f:
+                yaml.safe_dump(playbook, f, sort_keys=False, allow_unicode=False)
+        except Exception as exc:
+            logger.error("Failed to write playbook %s: %s", playbook_id, exc)
+            raise
+
+        self._playbooks_cache[playbook_id] = playbook
+        return playbook
 
     async def run_playbook(self, playbook_id: str, params: Dict[str, Any]) -> Dict[str, Any]:
         """Currently supports AutoML steps; can be extended for SQL/report steps."""
@@ -70,6 +90,7 @@ class PlaybookService:
             "task": merged_params.get("task", "classification"),
             "target_column": merged_params["target_column"],
             "training_data": merged_params["training_data"],
+            "target_table": merged_params.get("target_table"),
             "validation_data": merged_params.get("validation_data"),
             "metric": merged_params.get("metric"),
             "time_limit_minutes": merged_params.get("time_limit_minutes", 30),
@@ -87,3 +108,18 @@ class PlaybookService:
             "playbook_id": playbook_id,
             "summary": submission.get("summary"),
         }
+
+    def _extract_defaults(self, playbook: Dict[str, Any]) -> Dict[str, Any]:
+        automl_steps = [s for s in playbook.get("steps", []) if s.get("type") == "automl"]
+        if not automl_steps:
+            return {}
+        params = automl_steps[0].get("params", {}) or {}
+        keys = [
+            "target_column",
+            "target_table",
+            "metric",
+            "time_limit_minutes",
+            "max_trials",
+            "task",
+        ]
+        return {k: v for k, v in params.items() if k in keys and v is not None}

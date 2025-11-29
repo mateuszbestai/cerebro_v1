@@ -67,6 +67,14 @@ export interface Playbook {
   domain?: string;
   required_inputs?: string[];
   steps?: string[];
+  defaults?: {
+    target_column?: string;
+    target_table?: string;
+    metric?: string;
+    time_limit_minutes?: number;
+    max_trials?: number;
+    task?: string;
+  };
 }
 
 export interface PlaybookRunParams {

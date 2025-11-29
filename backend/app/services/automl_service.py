@@ -1,5 +1,6 @@
 import json
 import logging
+import typing
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -10,8 +11,20 @@ from app.services.azure_openai import AzureOpenAIService
 
 logger = logging.getLogger(__name__)
 
+# Marshmallow 3.x no longer exposes `_T` from `marshmallow.fields`, but
+# azure-ai-ml still imports it. Patch it in before importing azure-ai-ml.
 try:
-    from azure.identity import DefaultAzureCredential, ClientSecretCredential
+    import marshmallow.fields as _mm_fields
+    import marshmallow.validate as _mm_validate
+
+    if not hasattr(_mm_fields, "_T"):
+        _mm_fields._T = getattr(_mm_validate, "_T", typing.TypeVar("_T"))  # type: ignore[attr-defined]
+except Exception as patch_exc:  # pragma: no cover - best-effort shim
+    logger.debug("Failed to patch marshmallow for azure-ai-ml: %s", patch_exc)
+
+try:
+    from azure.identity import DefaultAzureCredential, ClientSecretCredential, CredentialUnavailableError
+    from azure.core.exceptions import ClientAuthenticationError
     from azure.ai.ml import MLClient, automl, Input
     from azure.ai.ml.constants import AssetTypes
 
@@ -19,6 +32,7 @@ try:
 except ImportError:
     AZURE_ML_AVAILABLE = False
     MLClient = None  # type: ignore
+    CredentialUnavailableError = ClientAuthenticationError = Exception  # type: ignore
     logger.warning("azure-ai-ml not installed; AutoML features will run in stub mode.")
 
 
@@ -77,6 +91,20 @@ class AutoMLService:
             )
         return DefaultAzureCredential(exclude_interactive_browser_credential=True)
 
+    def _verify_credential(self, credential) -> bool:
+        """Eagerly validate that the credential can fetch a token."""
+        if not credential:
+            return False
+        try:
+            credential.get_token("https://management.azure.com/.default")
+            return True
+        except (CredentialUnavailableError, ClientAuthenticationError) as exc:
+            logger.warning("Azure ML credential unavailable: %s", exc)
+            return False
+        except Exception as exc:  # pragma: no cover - defensive
+            logger.warning("Azure ML credential validation failed: %s", exc)
+            return False
+
     def _get_ml_client(self) -> Optional[MLClient]:
         if not self._azure_available:
             return None
@@ -84,6 +112,9 @@ class AutoMLService:
             return self._ml_client
         try:
             credential = self._get_credential()
+            if not self._verify_credential(credential):
+                self._azure_available = False
+                return None
             self._ml_client = MLClient(
                 credential=credential,
                 subscription_id=settings.AZURE_ML_SUBSCRIPTION_ID,
@@ -96,6 +127,20 @@ class AutoMLService:
             self._azure_available = False
             return None
 
+    def _stub_job(self, job_name: str, created_at: str, message: str) -> Dict[str, Any]:
+        """Record and return a stubbed job result when Azure ML is unavailable."""
+        summary = "AutoML stub run completed locally."
+        self._jobs[job_name] = {
+            "status": "completed",
+            "job_id": job_name,
+            "created_at": created_at,
+            "message": message,
+            "metrics": {},
+            "summary": summary,
+            "local": True,
+        }
+        return {"job_id": job_name, "status": "completed", "summary": summary}
+
     async def submit_job(self, payload: Dict[str, Any]) -> Dict[str, Any]:
         """Submit an AutoML job to Azure ML. Falls back to a stub job if unavailable."""
         config = AutoMLJobConfig.from_payload(payload)
@@ -104,16 +149,11 @@ class AutoMLService:
 
         ml_client = self._get_ml_client()
         if not ml_client:
-            self._jobs[job_name] = {
-                "status": "completed",
-                "job_id": job_name,
-                "created_at": created_at,
-                "message": "Azure ML not configured; returning stubbed result.",
-                "metrics": {},
-                "summary": "AutoML stub run completed locally.",
-                "local": True,
-            }
-            return {"job_id": job_name, "status": "completed", "summary": "Stub AutoML run"}
+            return self._stub_job(
+                job_name,
+                created_at,
+                "Azure ML not configured or credentials unavailable; returning stubbed result.",
+            )
 
         try:
             training_input = Input(type=AssetTypes.URI_FILE, path=config.training_data)
@@ -122,19 +162,22 @@ class AutoMLService:
                 if config.validation_data
                 else None
             )
+            compute_name = config.compute_name or settings.AZURE_ML_COMPUTE_NAME or None
 
             job_kwargs = dict(
-                compute=config.compute_name or settings.AZURE_ML_COMPUTE_NAME,
+                compute=compute_name,
                 experiment_name=config.experiment_name,
-                target_column=config.target_column,
+                # azure-ai-ml expects target_column_name (target_column is not recognized)
+                target_column_name=config.target_column,
                 training_data=training_input,
                 primary_metric=config.metric,
                 tags=config.tags,
-                name=job_name,
-                timeout_minutes=config.time_limit_minutes,
             )
             if validation_input:
                 job_kwargs["validation_data"] = validation_input
+
+            # Drop empty values to avoid passing unexpected kwargs to the SDK
+            job_kwargs = {k: v for k, v in job_kwargs.items() if v not in (None, "")}
 
             if config.task.lower() == "regression":
                 aml_job = automl.regression(**job_kwargs)
@@ -142,6 +185,9 @@ class AutoMLService:
                 aml_job = automl.forecasting(**job_kwargs)
             else:
                 aml_job = automl.classification(**job_kwargs)
+
+            # Name cannot be passed as a kwarg for some SDK versions
+            aml_job.name = job_name
 
             aml_job.set_limits(
                 timeout_minutes=config.time_limit_minutes,
@@ -156,6 +202,14 @@ class AutoMLService:
                 "local": False,
             }
             return {"job_id": getattr(submitted, "name", job_name), "status": getattr(submitted, "status", "submitted")}
+        except (CredentialUnavailableError, ClientAuthenticationError) as exc:
+            logger.error("AutoML credential failure; falling back to stub: %s", exc)
+            self._azure_available = False
+            return self._stub_job(
+                job_name,
+                created_at,
+                "Azure ML credentials unavailable. Ensure AZURE_ML_CLIENT_ID/SECRET/TENANT_ID are set or run 'az login'.",
+            )
         except Exception as exc:
             logger.error(f"AutoML job submission failed: {exc}")
             self._jobs[job_name] = {

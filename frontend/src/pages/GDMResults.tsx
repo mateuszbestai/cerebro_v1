@@ -27,6 +27,7 @@ import {
   GDMTimelineItem,
 } from '../services/gdmApi';
 import { saveLastGdmJob } from '../utils/gdmStorage';
+import PlaybookFromGDM from '../components/Playbooks/PlaybookFromGDM';
 
 const DEFAULT_ARTIFACT = 'global_model.json';
 
@@ -156,6 +157,10 @@ const GDMResults: React.FC = () => {
   const insights = insightsQuery.data;
   const timeline: GDMTimelineItem[] = results?.timeline ?? [];
 
+  const handlePlaybookGenerated = (pb: { name: string }) => {
+    setToast({ message: `Playbook "${pb.name}" created from this GDM.`, severity: 'success' });
+  };
+
   useEffect(() => {
     if (results?.job_id) {
       saveLastGdmJob({
@@ -195,6 +200,12 @@ const GDMResults: React.FC = () => {
           </Alert>
         )}
         {summaryQuery.isLoading && <Skeleton variant="rounded" height={80} />}
+
+        {results && (
+          <Box sx={{ mt: 3 }}>
+            <PlaybookFromGDM jobId={jobId} results={results} onGenerated={handlePlaybookGenerated} />
+          </Box>
+        )}
       </Box>
 
       {resultsQuery.isError && <Alert severity="error">Unable to load GDM results.</Alert>}

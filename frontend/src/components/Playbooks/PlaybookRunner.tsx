@@ -16,6 +16,7 @@ import {
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import { useDispatch, useSelector } from 'react-redux';
+import { Link as RouterLink } from 'react-router-dom';
 import { apiClient } from '../../services/api';
 import { RootState } from '../../store';
 import {
@@ -30,6 +31,7 @@ import {
 import { addResult } from '../../store/analysisSlice';
 import { AutoMLJobStatus, Playbook } from '../../types';
 import AutoMLStatus from './AutoMLStatus';
+import { loadLastGdmJob } from '../../utils/gdmStorage';
 
 interface Props {
   compact?: boolean;
@@ -42,8 +44,10 @@ const PlaybookRunner: React.FC<Props> = ({ compact }) => {
   );
 
   const [open, setOpen] = useState(false);
+  const [gdmPromptOpen, setGdmPromptOpen] = useState(false);
   const [trainingData, setTrainingData] = useState('');
   const [targetColumn, setTargetColumn] = useState('');
+  const [targetTable, setTargetTable] = useState('');
   const [metric, setMetric] = useState('AUC_weighted');
   const [timeLimit, setTimeLimit] = useState(30);
 
@@ -59,9 +63,28 @@ const PlaybookRunner: React.FC<Props> = ({ compact }) => {
         .listPlaybooks()
         .then((data) => dispatch(setPlaybooks(data)))
         .catch((err) => dispatch(setError(err.message || 'Failed to load playbooks')))
-        .finally(() => dispatch(setLoading(false)));
+      .finally(() => dispatch(setLoading(false)));
     }
   }, [open, playbooks.length, dispatch]);
+
+  useEffect(() => {
+    if (!selectedPlaybook) {
+      return;
+    }
+    const defaults = selectedPlaybook.defaults || {};
+    if (defaults.target_column) {
+      setTargetColumn(defaults.target_column);
+    }
+    if (defaults.target_table) {
+      setTargetTable(defaults.target_table);
+    }
+    if (defaults.metric) {
+      setMetric(defaults.metric);
+    }
+    if (defaults.time_limit_minutes) {
+      setTimeLimit(defaults.time_limit_minutes);
+    }
+  }, [selectedPlaybook]);
 
   useEffect(() => {
     if (!activeJobId) return;
@@ -93,7 +116,14 @@ const PlaybookRunner: React.FC<Props> = ({ compact }) => {
     return () => clearInterval(interval);
   }, [activeJobId, dispatch, selectedPlaybook]);
 
-  const handleOpen = () => setOpen(true);
+  const handleOpen = () => {
+    const latestGdm = loadLastGdmJob();
+    if (!latestGdm) {
+      setGdmPromptOpen(true);
+      return;
+    }
+    setOpen(true);
+  };
   const handleClose = () => {
     setOpen(false);
     dispatch(clearJob());
@@ -114,6 +144,7 @@ const PlaybookRunner: React.FC<Props> = ({ compact }) => {
         params: {
           training_data: trainingData,
           target_column: targetColumn,
+          target_table: targetTable || undefined,
           metric,
           time_limit_minutes: timeLimit,
         },
@@ -161,6 +192,30 @@ const PlaybookRunner: React.FC<Props> = ({ compact }) => {
         Run Playbook
       </Button>
 
+      <Dialog open={gdmPromptOpen} onClose={() => setGdmPromptOpen(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>Build a Global Data Model first</DialogTitle>
+        <DialogContent dividers>
+          <Typography gutterBottom>
+            Playbooks are tailored to your database. Create a Global Data Model so the AI can understand entities,
+            relationships, and candidates for prediction targets.
+          </Typography>
+          <Alert severity="info">
+            Go to the Database workspace and run "Prepare a Global Data Model" to unlock playbook generation.
+          </Alert>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setGdmPromptOpen(false)}>Maybe later</Button>
+          <Button
+            component={RouterLink}
+            to="/database"
+            variant="contained"
+            onClick={() => setGdmPromptOpen(false)}
+          >
+            Open GDM builder
+          </Button>
+        </DialogActions>
+      </Dialog>
+
       <Dialog open={open} onClose={handleClose} maxWidth="md" fullWidth>
         <DialogTitle>Playbooks</DialogTitle>
         <DialogContent dividers>
@@ -185,6 +240,11 @@ const PlaybookRunner: React.FC<Props> = ({ compact }) => {
               ) : (
                 <Stack spacing={2}>
                   <Typography variant="h6">{selectedPlaybook.name}</Typography>
+                  {selectedPlaybook.defaults?.task && (
+                    <Typography variant="body2" color="text.secondary">
+                      Suggested task: {selectedPlaybook.defaults.task}
+                    </Typography>
+                  )}
                   <TextField
                     label="Training data URI (Azure Blob/Datastore)"
                     value={trainingData}
@@ -192,6 +252,14 @@ const PlaybookRunner: React.FC<Props> = ({ compact }) => {
                     fullWidth
                     size="small"
                     placeholder="azureml://datastores/..../paths/data.csv"
+                  />
+                  <TextField
+                    label="Target table (optional)"
+                    value={targetTable}
+                    onChange={(e) => setTargetTable(e.target.value)}
+                    fullWidth
+                    size="small"
+                    placeholder={selectedPlaybook.defaults?.target_table || 'sales, customers, etc.'}
                   />
                   <TextField
                     label="Target column"
