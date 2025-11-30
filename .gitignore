@@ -70,3 +70,9 @@ dump.rdb
 ssl/
 
 reports/
+conformed_views.sql
+global_model.json
+glossary.json
+model.mmd
+relationships.csv
+
