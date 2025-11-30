@@ -24,8 +24,9 @@ import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import React, { useMemo, useState } from 'react';
 import SyntaxHighlighter from 'react-syntax-highlighter';
-import { materialDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
+import { materialDark, materialLight } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { GDMRelationshipReview } from '../../services/gdmApi';
+import { useTheme } from '@mui/material/styles';
 
 interface RelationshipsReviewProps {
   review?: GDMRelationshipReview;
@@ -40,6 +41,7 @@ const RelationshipsReview: React.FC<RelationshipsReviewProps> = ({
   onConfirm,
   confirming,
 }) => {
+  const theme = useTheme();
   const [tab, setTab] = useState<'candidates' | 'confirmed'>('candidates');
   const [selected, setSelected] = useState<Record<string, boolean>>({});
   const [expanded, setExpanded] = useState<string | null>(null);
@@ -73,7 +75,15 @@ const RelationshipsReview: React.FC<RelationshipsReviewProps> = ({
   };
 
   return (
-    <Paper variant="outlined" sx={{ p: 3 }}>
+    <Paper
+      variant="outlined"
+      sx={{
+        p: 3,
+        backgroundColor:
+          theme.palette.mode === 'dark' ? 'rgba(17,22,20,0.9)' : theme.palette.background.paper,
+        borderColor: theme.palette.divider,
+      }}
+    >
       <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" alignItems="center" spacing={2}>
         <Box>
           <Typography variant="h6">Relationships Review</Typography>
@@ -93,7 +103,34 @@ const RelationshipsReview: React.FC<RelationshipsReviewProps> = ({
         <Tab label={`Confirmed (${review.confirmed.length})`} value="confirmed" />
       </Tabs>
 
-      <Table size="small" sx={{ mt: 2 }}>
+      <Table
+        size="small"
+        sx={{
+          mt: 2,
+          border: `1px solid ${theme.palette.divider}`,
+          borderRadius: 2,
+          overflow: 'hidden',
+          '& th': {
+            backgroundColor:
+              theme.palette.mode === 'dark'
+                ? 'rgba(255,255,255,0.08)'
+                : 'rgba(0,0,0,0.03)',
+            color: theme.palette.text.secondary,
+            fontWeight: 700,
+            borderColor: theme.palette.divider,
+          },
+          '& td': {
+            color: theme.palette.text.primary,
+            borderColor: theme.palette.divider,
+          },
+          '& tbody tr:nth-of-type(odd)': {
+            backgroundColor:
+              theme.palette.mode === 'dark'
+                ? 'rgba(255,255,255,0.06)'
+                : 'rgba(0,0,0,0.015)',
+          },
+        }}
+      >
         <TableHead>
           <TableRow>
             {tab === 'candidates' && (
@@ -148,7 +185,20 @@ const RelationshipsReview: React.FC<RelationshipsReviewProps> = ({
                 </TableCell>
                 <TableCell>
                   <Tooltip title={rel.evidence || ''}>
-                    <Chip label="Evidence" variant="outlined" />
+                    <Chip
+                      label="Evidence"
+                      variant="outlined"
+                      sx={{
+                        borderColor:
+                          theme.palette.mode === 'dark'
+                            ? 'rgba(255,255,255,0.2)'
+                            : theme.palette.primary.light,
+                        backgroundColor:
+                          theme.palette.mode === 'dark'
+                            ? 'rgba(255,255,255,0.06)'
+                            : 'rgba(118,185,0,0.08)',
+                      }}
+                    />
                   </Tooltip>
                 </TableCell>
                 <TableCell>
@@ -171,8 +221,15 @@ const RelationshipsReview: React.FC<RelationshipsReviewProps> = ({
                   <Collapse in={expanded === rel.id}>
                     <SyntaxHighlighter
                       language="sql"
-                      style={materialDark}
-                      customStyle={{ margin: 0, borderRadius: 0 }}
+                      style={theme.palette.mode === 'dark' ? materialDark : materialLight}
+                      customStyle={{
+                        margin: 0,
+                        borderRadius: 0,
+                        background:
+                          theme.palette.mode === 'dark'
+                            ? 'rgba(0,0,0,0.7)'
+                            : 'rgba(245,247,245,0.95)',
+                      }}
                     >
                       {rel.preview_sql || '-- preview unavailable'}
                     </SyntaxHighlighter>

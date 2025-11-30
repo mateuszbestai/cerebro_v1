@@ -425,8 +425,23 @@ const ConnectionDialog: React.FC<ConnectionDialogProps> = ({ open, onClose }) =>
                     Click "Test Connection" to verify your settings
                   </Typography>
                   
-                  <Box sx={{ mt: 3, p: 2, bgcolor: 'grey.50', borderRadius: 1, textAlign: 'left' }}>
-                    <Typography variant="subtitle2" gutterBottom>Connection Details:</Typography>
+                  <Box
+                    sx={(theme) => ({
+                      mt: 3,
+                      p: 2,
+                      borderRadius: 1,
+                      textAlign: 'left',
+                      color: theme.palette.text.primary,
+                      bgcolor:
+                        theme.palette.mode === 'dark'
+                          ? 'rgba(255,255,255,0.06)'
+                          : 'rgba(11,15,13,0.04)',
+                      border: `1px solid ${theme.palette.divider}`,
+                    })}
+                  >
+                    <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+                      Connection Details:
+                    </Typography>
                     <Typography variant="body2">Server: {form.server}</Typography>
                     <Typography variant="body2">Database: {form.database}</Typography>
                     <Typography variant="body2">Username: {form.username}</Typography>

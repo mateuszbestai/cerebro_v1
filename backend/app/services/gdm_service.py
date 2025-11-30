@@ -580,20 +580,58 @@ class GDMService:
         }
 
     def _build_mermaid(self, metadata: Dict[str, Any], relationships: List[Dict[str, Any]]) -> str:
+        def _safe_identifier(value: str) -> str:
+            return (
+                value.replace(" ", "_")
+                .replace("-", "_")
+                .replace(".", "_")
+                .replace("[", "")
+                .replace("]", "")
+            )
+
+        def _safe_label(value: str) -> str:
+            return value.replace('"', "'")
+
         lines = ["erDiagram"]
-        for entity in metadata["entities"]:
-            label = f"{entity['schema']}_{entity['name']}".replace(".", "_")
+
+        for entity in sorted(
+            metadata["entities"], key=lambda item: (item["schema"], item["name"])
+        ):
+            label = _safe_identifier(f"{entity['schema']}_{entity['name']}")
             lines.append(f"  {label} {{")
-            for column in entity["columns"]:
-                pk_flag = " PK" if column["is_primary_key"] else ""
-                lines.append(f"    {column['type']} {column['name']}{pk_flag}")
+            for column in sorted(entity["columns"], key=lambda col: col["name"]):
+                col_type = _safe_label((column.get("type") or "string").upper())
+                pk_flag = " PK" if column.get("is_primary_key") else ""
+                null_flag = "" if column.get("nullable", True) else " NOT NULL"
+                lines.append(f"    {col_type} {column['name']}{pk_flag}{null_flag}")
             lines.append("  }")
 
-        for rel in relationships:
-            left = rel["from_table"].replace(".", "_")
-            right = rel["to_table"].replace(".", "_")
-            # Escape the closing brace in Mermaid relationship syntax within f-string
-            lines.append(f"  {left} }}|--|| {right} : \"{rel['from_column']}\"")
+        seen_edges = set()
+        for rel in sorted(
+            relationships,
+            key=lambda r: (
+                r.get("from_table", ""),
+                r.get("to_table", ""),
+                r.get("from_column", ""),
+            ),
+        ):
+            left = _safe_identifier(rel["from_table"])
+            right = _safe_identifier(rel["to_table"])
+            edge_key = (left, right, rel.get("from_column"), rel.get("to_column"))
+            if edge_key in seen_edges:
+                continue
+            seen_edges.add(edge_key)
+            source_col = _safe_label(rel.get("from_column") or "fk")
+            target_col = _safe_label(rel.get("to_column") or "pk")
+            strategy = rel.get("strategy")
+            confidence = rel.get("confidence")
+            label_parts = [f"{source_col} -> {target_col}"]
+            if strategy:
+                label_parts.append(f"({strategy})")
+            if confidence is not None:
+                label_parts.append(f"{round(confidence * 100)}%")
+            label_text = " ".join(label_parts)
+            lines.append(f'  {left} ||--o{{ {right} : "{label_text}"')
 
         return "\n".join(lines)
 

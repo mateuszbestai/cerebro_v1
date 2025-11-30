@@ -115,15 +115,24 @@ const PlaybookFromGDM: React.FC<Props> = ({ jobId, results, onGenerated }) => {
   return (
     <Paper
       variant="outlined"
-      sx={{
+      sx={(theme) => ({
         p: 3,
         borderRadius: 3,
-        borderColor: 'primary.main',
-        background: (theme) =>
+        borderColor:
+          theme.palette.mode === 'dark' ? 'rgba(118,185,0,0.45)' : 'rgba(118,185,0,0.28)',
+        background:
           theme.palette.mode === 'dark'
-            ? 'linear-gradient(135deg, rgba(118,185,0,0.12), rgba(0,180,216,0.08))'
-            : 'linear-gradient(135deg, rgba(118,185,0,0.08), rgba(0,180,216,0.06))',
-      }}
+            ? 'linear-gradient(145deg, rgba(12,18,15,0.96), rgba(10,14,12,0.9)), radial-gradient(circle at 14% 18%, rgba(118,185,0,0.24), transparent 38%), radial-gradient(circle at 90% 10%, rgba(0,180,216,0.22), transparent 34%)'
+            : 'linear-gradient(145deg, #f7fbf7, #eef4ee)',
+        boxShadow:
+          theme.palette.mode === 'dark'
+            ? '0 18px 48px rgba(0,0,0,0.55)'
+            : '0 12px 32px rgba(11,15,13,0.12)',
+        '& .MuiOutlinedInput-root': {
+          backgroundColor:
+            theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.04)' : 'rgba(255,255,255,0.92)',
+        },
+      })}
     >
       <Stack spacing={2}>
         <Stack direction="row" alignItems="center" spacing={1}>

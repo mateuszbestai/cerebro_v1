@@ -104,7 +104,15 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
 
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
           <Tooltip title="Toggle theme">
-            <IconButton color="inherit" onClick={toggle}>
+            <IconButton
+              color="inherit"
+              aria-label="Toggle theme"
+              onClick={toggle}
+              sx={{
+                color: '#fff',
+                '& svg': { color: '#fff' },
+              }}
+            >
               {mode === 'dark' ? <Brightness7 /> : <Brightness4 />}
             </IconButton>
           </Tooltip>
