@@ -20,6 +20,9 @@ langchain-community
 # Azure
 azure-identity==1.15.0
 azure-keyvault-secrets==4.7.0
+azure-ai-ml==1.19.0
+azure-storage-blob==12.19.1
+marshmallow>=3.20,<4  # Pin for azure-ai-ml compatibility (marshmallow 4 removes _T)
 
 # Data Processing
 pandas==2.1.4
@@ -46,6 +49,7 @@ aiofiles==23.2.1
 httpx==0.26.0
 websockets==12.0
 scipy==1.11.4  # For statistical operations
+PyYAML==6.0.1  # Playbook definitions
 
 # Testing
 pytest==7.4.4

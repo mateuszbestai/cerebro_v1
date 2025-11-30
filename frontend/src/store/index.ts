@@ -2,6 +2,7 @@ import { configureStore } from '@reduxjs/toolkit';
 import chatReducer from './chatSlice';
 import analysisReducer from './analysisSlice';
 import dashboardReducer from './dashboardSlice';
+import playbooksReducer from './playbooksSlice';
 import { loadState, saveState } from './persist';
 import { AnalysisState } from '../types';
 
@@ -24,6 +25,7 @@ export const store = configureStore({
     chat: chatReducer,
     analysis: analysisReducer,
     dashboard: dashboardReducer,
+    playbooks: playbooksReducer,
   },
   preloadedState: persisted ? {
     analysis: preloadedAnalysis as AnalysisState,

@@ -94,6 +94,20 @@ This document outlines the major enhancements made to the AI Analysis Agent appl
 - Quick navigation between past analyses
 - Compare results side-by-side capability
 
+## 6. AutoML Playbooks ✅
+
+- **Azure ML AutoML integration** (`backend/app/services/automl_service.py`, `backend/app/api/routes/playbooks.py`)
+  - Submit Azure ML AutoML jobs for classification/regression/forecasting
+  - Poll job status and summarize metrics via Azure OpenAI
+  - Graceful stub mode when Azure ML is not configured
+- **Playbook registry** (`backend/app/services/playbook_service.py`, `backend/reports/playbooks/churn_watch.yaml`)
+  - YAML-defined playbooks with required inputs and AutoML step defaults
+  - New API endpoints: `GET /api/v1/playbooks`, `POST /api/v1/playbooks/run`, `GET /api/v1/automl/{job_id}`
+- **Frontend surface** (`frontend/src/components/Playbooks/PlaybookRunner.tsx`)
+  - Dialog-based playbook picker and AutoML launcher
+  - Inline AutoML job status, metrics, and summaries
+  - Pushes completed runs into analysis history for quick recall
+
 ## Technical Stack Updates
 
 ### Backend Dependencies
