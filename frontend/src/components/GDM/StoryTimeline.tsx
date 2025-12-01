@@ -1,4 +1,4 @@
-import { Box, Stack, Typography } from '@mui/material';
+import { Box, Stack, Typography, useTheme } from '@mui/material';
 import React from 'react';
 import { GDMTimelineItem } from '../../services/gdmApi';
 
@@ -6,16 +6,22 @@ interface StoryTimelineProps {
   items?: GDMTimelineItem[];
 }
 
-const statusColor: Record<string, string> = {
-  done: '#76B900',
-  in_progress: '#FFC857',
-  failed: '#FF6B6B',
-  pending: 'rgba(255,255,255,0.4)',
-};
-
 const StoryTimeline: React.FC<StoryTimelineProps> = ({ items }) => {
+  const theme = useTheme();
+  const isDark = theme.palette.mode === 'dark';
+
+  const statusColor: Record<string, string> = {
+    done: '#76B900',
+    in_progress: '#FFC857',
+    failed: '#FF6B6B',
+    pending: isDark ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.25)',
+  };
+
+  const lineColor = isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)';
+  const borderColor = isDark ? theme.palette.background.paper : theme.palette.background.default;
+
   if (!items || items.length === 0) {
-    return <Typography variant="body2">Timeline unavailable.</Typography>;
+    return <Typography variant="body2" color="text.secondary">Timeline unavailable.</Typography>;
   }
 
   return (
@@ -28,12 +34,12 @@ const StoryTimeline: React.FC<StoryTimelineProps> = ({ items }) => {
                 width: 14,
                 height: 14,
                 borderRadius: '50%',
-                backgroundColor: statusColor[item.status] || 'var(--text-muted)',
-                border: '2px solid var(--surface-2)',
+                backgroundColor: statusColor[item.status] || theme.palette.text.secondary,
+                border: `2px solid ${borderColor}`,
               }}
             />
             {index !== items.length - 1 && (
-              <Box sx={{ width: 2, flex: 1, backgroundColor: 'rgba(255,255,255,0.1)', mt: 1 }} />
+              <Box sx={{ width: 2, flex: 1, backgroundColor: lineColor, mt: 1 }} />
             )}
           </Box>
           <Box>

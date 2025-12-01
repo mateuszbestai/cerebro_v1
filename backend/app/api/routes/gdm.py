@@ -61,6 +61,62 @@ class EntityColumn(APIModel):
     max_length: Optional[int] = None
     default: Optional[str] = None
     is_primary_key: Optional[bool] = None
+    semantic_type: Optional[str] = None
+    semantic_description: Optional[str] = None
+
+
+class FeatureAvailability(APIModel):
+    table: Optional[str] = None
+    column: str
+    reason: str
+
+
+class AutomlTarget(APIModel):
+    table: str
+    column: str
+    task: str
+    reason: str
+    semantic_type: Optional[str] = None
+    business_process: Optional[str] = None
+    row_count: Optional[int] = None
+    feature_time: Optional[FeatureAvailability] = None
+
+
+class BusinessProcessHint(APIModel):
+    table: str
+    process: str
+    confidence: float
+    reason: str
+
+
+class KPISignal(APIModel):
+    table: str
+    column: str
+    semantic_type: Optional[str] = None
+    definition: Optional[str] = None
+
+
+class FeatureSuggestion(APIModel):
+    table: str
+    features: List[str]
+    reason: str
+    feature_time: Optional[FeatureAvailability] = None
+
+
+class ColumnSemantic(APIModel):
+    table: str
+    column: str
+    semantic_type: str
+    description: Optional[str] = None
+
+
+class AutomlGuidance(APIModel):
+    recommended_targets: List[AutomlTarget] = Field(default_factory=list)
+    feature_availability: List[FeatureAvailability] = Field(default_factory=list)
+    business_processes: List[BusinessProcessHint] = Field(default_factory=list)
+    kpi_columns: List[KPISignal] = Field(default_factory=list)
+    feature_suggestions: List[FeatureSuggestion] = Field(default_factory=list)
+    semantic_columns: List[ColumnSemantic] = Field(default_factory=list)
 
 
 class GraphNode(APIModel):
@@ -76,6 +132,10 @@ class GraphNode(APIModel):
     columns: List[EntityColumn] = Field(default_factory=list)
     tags: List[str] = Field(default_factory=list)
     profile: Optional[Dict[str, Any]] = None
+    business_process: Optional[str] = None
+    feature_time: Optional[FeatureAvailability] = None
+    kpi_columns: List[str] = Field(default_factory=list)
+    target_recommendations: List[AutomlTarget] = Field(default_factory=list)
 
 
 class GraphEdge(APIModel):
@@ -125,6 +185,7 @@ class GDMResultsResponse(APIModel):
     glossary_terms: int
     ai_usage_enabled: bool
     relationship_overview: Dict[str, int]
+    automl_guidance: Optional[AutomlGuidance] = None
 
 
 class GDMNaturalLanguageSummaryResponse(APIModel):

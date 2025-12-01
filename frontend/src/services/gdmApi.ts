@@ -43,6 +43,8 @@ export interface GDMEntityColumn {
   max_length?: number | null;
   default?: string | null;
   is_primary_key?: boolean;
+   semantic_type?: string;
+   semantic_description?: string;
 }
 
 export interface GDMGraphNode {
@@ -58,6 +60,10 @@ export interface GDMGraphNode {
   tags: string[];
   profile?: Record<string, any>;
   position: { x: number; y: number };
+  business_process?: string;
+  feature_time?: FeatureAvailabilityHint;
+  kpi_columns?: string[];
+  target_recommendations?: AutomlTargetRecommendation[];
 }
 
 export interface GDMGraphEdge {
@@ -75,6 +81,60 @@ export interface GDMResultsStats {
   avg_degree: number;
   max_degree: number;
   isolated_nodes: number;
+}
+
+export interface FeatureAvailabilityHint {
+  table?: string;
+  column: string;
+  reason: string;
+}
+
+export interface AutomlTargetRecommendation {
+  table: string;
+  column: string;
+  task: string;
+  reason: string;
+  semantic_type?: string;
+  business_process?: string;
+  row_count?: number;
+  feature_time?: FeatureAvailabilityHint;
+}
+
+export interface BusinessProcessHint {
+  table: string;
+  process: string;
+  confidence: number;
+  reason: string;
+}
+
+export interface KPISignal {
+  table: string;
+  column: string;
+  semantic_type?: string;
+  definition?: string;
+}
+
+export interface FeatureSuggestion {
+  table: string;
+  features: string[];
+  reason: string;
+  feature_time?: FeatureAvailabilityHint;
+}
+
+export interface ColumnSemantic {
+  table: string;
+  column: string;
+  semantic_type: string;
+  description?: string;
+}
+
+export interface AutomlGuidance {
+  recommended_targets: AutomlTargetRecommendation[];
+  feature_availability: FeatureAvailabilityHint[];
+  business_processes: BusinessProcessHint[];
+  kpi_columns: KPISignal[];
+  feature_suggestions: FeatureSuggestion[];
+  semantic_columns: ColumnSemantic[];
 }
 
 export interface GDMTimelineItem {
@@ -102,6 +162,7 @@ export interface GDMResultsResponse {
   glossary_terms: number;
   ai_usage_enabled: boolean;
   relationship_overview: Record<string, number>;
+  automl_guidance?: AutomlGuidance;
 }
 
 export interface GDMNaturalLanguageSummary {

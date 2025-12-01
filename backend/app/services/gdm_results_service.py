@@ -8,6 +8,7 @@ from pathlib import Path
 from threading import Lock
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
+from app.services.gdm_automl import prepare_automl_metadata
 from app.services.gdm_service import GDMJob, gdm_service
 
 
@@ -65,7 +66,7 @@ class GDMResultsService:
     # -------------------------------------------------------------------------
     def get_results(self, job_id: str) -> Dict[str, Any]:
         job_dir = self._resolve_job_dir(job_id)
-        global_model = self._load_json(job_dir / "global_model.json")
+        global_model = self._ensure_automl_annotations(self._load_json(job_dir / "global_model.json"))
         entities = global_model.get("entities", [])
         relationships = global_model.get("relationships", [])
 
@@ -99,11 +100,12 @@ class GDMResultsService:
                 "confirmed": len(relationship_review["confirmed"]),
                 "candidates": len(relationship_review["candidates"]),
             },
+            "automl_guidance": global_model.get("automl_guidance", {}),
         }
 
     def get_narrative_summary(self, job_id: str) -> Dict[str, Any]:
         job_dir = self._resolve_job_dir(job_id)
-        global_model = self._load_json(job_dir / "global_model.json")
+        global_model = self._ensure_automl_annotations(self._load_json(job_dir / "global_model.json"))
         entities = global_model.get("entities", [])
         relationships = global_model.get("relationships", [])
         nodes, edges = self._build_graph(entities, relationships, global_model.get("profiles", {}))
@@ -127,7 +129,7 @@ class GDMResultsService:
 
     def get_insights(self, job_id: str) -> List[Dict[str, Any]]:
         job_dir = self._resolve_job_dir(job_id)
-        global_model = self._load_json(job_dir / "global_model.json")
+        global_model = self._ensure_automl_annotations(self._load_json(job_dir / "global_model.json"))
         entities = global_model.get("entities", [])
         relationships = global_model.get("relationships", [])
         profiles = global_model.get("profiles", {})
@@ -232,6 +234,7 @@ class GDMResultsService:
     ) -> Dict[str, Any]:
         job_dir = self._resolve_job_dir(job_id)
         model = global_model or self._load_json(job_dir / "global_model.json")
+        model = self._ensure_automl_annotations(model)
         relationships = model.get("relationships", [])
 
         state = self._read_relationship_state(job_id)
@@ -285,6 +288,31 @@ class GDMResultsService:
     # -------------------------------------------------------------------------
     # Internal helpers
     # -------------------------------------------------------------------------
+    def _ensure_automl_annotations(self, global_model: Dict[str, Any]) -> Dict[str, Any]:
+        entities = global_model.get("entities", [])
+        relationships = global_model.get("relationships", [])
+        if not isinstance(relationships, list):
+            relationships = []
+        has_semantics = self._has_semantic_types(entities)
+        if global_model.get("automl_guidance") and has_semantics:
+            return global_model
+
+        enriched_entities, guidance = prepare_automl_metadata(
+            {"entities": entities},
+            relationships,
+            global_model.get("profiles", {}),
+        )
+        global_model["entities"] = enriched_entities
+        global_model["automl_guidance"] = guidance
+        return global_model
+
+    def _has_semantic_types(self, entities: List[Dict[str, Any]]) -> bool:
+        for entity in entities:
+            for column in entity.get("columns", []):
+                if "semantic_type" in column:
+                    return True
+        return False
+
     def _resolve_job_dir(self, job_id: str) -> Path:
         job: Optional[GDMJob] = self._gdm_service.get_status(job_id)
         if job and job.output_dir:
@@ -356,6 +384,10 @@ class GDMResultsService:
                 "degree": 0,
                 "tags": [],
                 "profile": profile,
+                "business_process": entity.get("business_process"),
+                "feature_time": entity.get("feature_time"),
+                "kpi_columns": entity.get("kpi_columns", []),
+                "target_recommendations": entity.get("target_recommendations", []),
             }
             node_lookup[node_id] = node
             nodes.append(node)

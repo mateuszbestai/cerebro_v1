@@ -11,7 +11,7 @@ import {
   Stack,
   Typography,
 } from '@mui/material';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
 import ArtifactTabs from '../components/GDM/ArtifactTabs';
 import GraphPanel from '../components/GDM/GraphPanel';
@@ -25,9 +25,11 @@ import {
   GDMResultsResponse,
   GDMInsight,
   GDMTimelineItem,
+  AutomlTargetRecommendation,
 } from '../services/gdmApi';
 import { saveLastGdmJob } from '../utils/gdmStorage';
 import PlaybookFromGDM from '../components/Playbooks/PlaybookFromGDM';
+import AutoMLGuidance from '../components/GDM/AutoMLGuidance';
 
 const DEFAULT_ARTIFACT = 'global_model.json';
 
@@ -57,7 +59,7 @@ const MetricsGrid: React.FC<{ results?: GDMResultsResponse; loading: boolean }> 
         <Grid item xs={12} md={3} key={card.label}>
           <Card variant="outlined">
             <CardContent>
-              <Typography variant="overline" sx={{ color: 'var(--text-muted)', letterSpacing: '0.2em' }}>
+              <Typography variant="overline" color="text.secondary" sx={{ letterSpacing: '0.2em' }}>
                 {card.label}
               </Typography>
               <Typography variant="h4">{card.value}</Typography>
@@ -79,6 +81,7 @@ const GDMResults: React.FC = () => {
   const [activeArtifact, setActiveArtifact] = useState(DEFAULT_ARTIFACT);
   const [focusedEntity, setFocusedEntity] = useState<string | null>(null);
   const [toast, setToast] = useState<{ message: string; severity: 'success' | 'error' } | null>(null);
+  const [prefillTarget, setPrefillTarget] = useState<{ table?: string; column?: string; task?: string } | null>(null);
 
   const resultsQuery = useQuery({
     queryKey: ['gdmResults', jobId],
@@ -147,6 +150,13 @@ const GDMResults: React.FC = () => {
   };
 
   const handleClearFocus = () => setFocusedEntity(null);
+  const handleApplyTarget = (rec: AutomlTargetRecommendation) => {
+    setPrefillTarget({ table: rec.table, column: rec.column, task: rec.task });
+    setToast({
+      message: `Using ${rec.table}.${rec.column} for AutoML playbooks.`,
+      severity: 'success',
+    });
+  };
 
   if (!jobId) {
     return <Alert severity="warning">Provide a job id via the route or ?jobId= query string.</Alert>;
@@ -156,6 +166,18 @@ const GDMResults: React.FC = () => {
   const summary = summaryQuery.data;
   const insights = insightsQuery.data;
   const timeline: GDMTimelineItem[] = results?.timeline ?? [];
+  const topRecommendation = results?.automl_guidance?.recommended_targets?.[0];
+  const activePrefill = useMemo(() => {
+    if (prefillTarget) return prefillTarget;
+    if (topRecommendation) {
+      return {
+        table: topRecommendation.table,
+        column: topRecommendation.column,
+        task: topRecommendation.task,
+      };
+    }
+    return undefined;
+  }, [prefillTarget, topRecommendation?.table, topRecommendation?.column, topRecommendation?.task]);
 
   const handlePlaybookGenerated = (pb: { name: string }) => {
     setToast({ message: `Playbook "${pb.name}" created from this GDM.`, severity: 'success' });
@@ -177,7 +199,7 @@ const GDMResults: React.FC = () => {
       <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
         <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" spacing={2}>
           <Box>
-            <Typography variant="overline" sx={{ letterSpacing: '0.2em', color: 'var(--text-muted)' }}>
+            <Typography variant="overline" color="text.secondary" sx={{ letterSpacing: '0.2em' }}>
               GLOBAL DATA MODEL
             </Typography>
             <Typography variant="h4">GDM Results</Typography>
@@ -201,9 +223,21 @@ const GDMResults: React.FC = () => {
         )}
         {summaryQuery.isLoading && <Skeleton variant="rounded" height={80} />}
 
+        {results?.automl_guidance && (
+          <Box sx={{ mt: 2, display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+            <Typography variant="h6">AutoML Guidance</Typography>
+            <AutoMLGuidance guidance={results.automl_guidance} onApplyTarget={handleApplyTarget} />
+          </Box>
+        )}
+
         {results && (
           <Box sx={{ mt: 3 }}>
-            <PlaybookFromGDM jobId={jobId} results={results} onGenerated={handlePlaybookGenerated} />
+            <PlaybookFromGDM
+              jobId={jobId}
+              results={results}
+              onGenerated={handlePlaybookGenerated}
+              prefillTarget={activePrefill}
+            />
           </Box>
         )}
       </Box>

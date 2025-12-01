@@ -1,7 +1,7 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap');
 
 :root {
-  /* Base */
+  /* Base - Dark mode defaults */
   --bg: #0B0F0D;
   --surface: #111614;
   --surface-2: #1A1F1E;
@@ -33,6 +33,30 @@
   --shadow-1: 0 6px 20px rgba(0, 0, 0, 0.35);
   --shadow-2: 0 18px 40px rgba(0, 0, 0, 0.45);
   --blur: 10px;
+
+  /* Timeline and component colors */
+  --timeline-line: rgba(255, 255, 255, 0.1);
+  --timeline-pending: rgba(255, 255, 255, 0.4);
+}
+
+/* Light mode overrides */
+[data-theme="light"],
+body.light-mode {
+  --bg: #f5f7f5;
+  --surface: #ffffff;
+  --surface-2: #f0f4f0;
+  --border: #D5DED2;
+  --ring: #76B900;
+
+  --text: #0B0F0D;
+  --text-dim: #4A5750;
+  --text-muted: #6B7A70;
+
+  --shadow-1: 0 6px 20px rgba(0, 0, 0, 0.08);
+  --shadow-2: 0 18px 40px rgba(0, 0, 0, 0.12);
+
+  --timeline-line: rgba(0, 0, 0, 0.12);
+  --timeline-pending: rgba(0, 0, 0, 0.3);
 }
 
 @media (prefers-reduced-motion: reduce) {

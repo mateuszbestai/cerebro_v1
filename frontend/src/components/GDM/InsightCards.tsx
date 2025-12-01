@@ -7,6 +7,7 @@ import {
   Stack,
   Typography,
   Chip,
+  useTheme,
 } from '@mui/material';
 import React from 'react';
 import { GDMInsight } from '../../services/gdmApi';
@@ -24,6 +25,9 @@ const severityColor: Record<string, 'default' | 'primary' | 'secondary' | 'error
 };
 
 const InsightCards: React.FC<InsightCardsProps> = ({ insights = [], loading, onSelect }) => {
+  const theme = useTheme();
+  const isDark = theme.palette.mode === 'dark';
+
   if (loading) {
     return (
       <Grid container spacing={2}>
@@ -45,14 +49,19 @@ const InsightCards: React.FC<InsightCardsProps> = ({ insights = [], loading, onS
             sx={{
               height: '100%',
               cursor: insight.affected_nodes.length ? 'pointer' : 'default',
-              borderColor: 'rgba(118,185,0,0.2)',
+              borderColor: isDark ? 'rgba(118,185,0,0.25)' : 'rgba(118,185,0,0.3)',
+              transition: 'border-color 0.2s, box-shadow 0.2s',
+              '&:hover': insight.affected_nodes.length ? {
+                borderColor: isDark ? 'rgba(118,185,0,0.5)' : 'rgba(118,185,0,0.6)',
+                boxShadow: isDark ? '0 4px 12px rgba(118,185,0,0.15)' : '0 4px 12px rgba(118,185,0,0.12)',
+              } : {},
             }}
             onClick={() => insight.affected_nodes.length && onSelect?.(insight.affected_nodes)}
           >
             <CardContent>
               <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
                 <Box>
-                  <Typography variant="subtitle2" sx={{ color: 'var(--text-muted)', letterSpacing: '0.08em' }}>
+                  <Typography variant="subtitle2" color="text.secondary" sx={{ letterSpacing: '0.08em' }}>
                     {insight.title}
                   </Typography>
                   <Typography variant="h6">{insight.value}</Typography>

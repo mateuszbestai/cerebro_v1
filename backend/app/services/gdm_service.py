@@ -16,6 +16,7 @@ from sqlalchemy import text
 from app.api.routes.database import active_connections, build_connection_string, ConnectionRequest
 from app.config import settings
 from app.services.azure_openai import AzureOpenAIService
+from app.services.gdm_automl import prepare_automl_metadata
 
 logger = logging.getLogger(__name__)
 
@@ -510,6 +511,11 @@ class GDMService:
         job_dir = job.output_dir or (self.output_root / job.database_id / job.model_used / job.job_id)
         job_dir.mkdir(parents=True, exist_ok=True)
 
+        enriched_entities, automl_guidance = prepare_automl_metadata(
+            metadata, relationships, profiles
+        )
+        metadata["entities"] = enriched_entities
+
         global_model = {
             "job_id": job.job_id,
             "database_id": job.database_id,
@@ -520,6 +526,7 @@ class GDMService:
             "profiles": profiles,
             "embeddings": embeddings,
             "summary": summary,
+            "automl_guidance": automl_guidance,
         }
 
         artifacts: List[Dict[str, str]] = []

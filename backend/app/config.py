@@ -24,36 +24,36 @@ class Settings(BaseSettings):
     PROJECT_NAME: str = "Cerebro"
     
     # Azure SQL Database (with defaults to prevent crashes)
-    AZURE_SQL_SERVER: str = os.getenv("AZURE_SQL_SERVER", "")
-    AZURE_SQL_DATABASE: str = os.getenv("AZURE_SQL_DATABASE", "")
-    AZURE_SQL_USERNAME: str = os.getenv("AZURE_SQL_USERNAME", "")
-    AZURE_SQL_PASSWORD: str = os.getenv("AZURE_SQL_PASSWORD", "")
-    
+    AZURE_SQL_SERVER: str = ""
+    AZURE_SQL_DATABASE: str = ""
+    AZURE_SQL_USERNAME: str = ""
+    AZURE_SQL_PASSWORD: str = ""
+
     # Azure OpenAI (with defaults)
-    AZURE_OPENAI_API_KEY: str = os.getenv("AZURE_OPENAI_API_KEY", "")
-    AZURE_OPENAI_ENDPOINT: str = os.getenv("AZURE_OPENAI_ENDPOINT", "")
-    AZURE_OPENAI_DEPLOYMENT_NAME: str = os.getenv("AZURE_OPENAI_DEPLOYMENT_NAME", "gpt-4o")
-    AZURE_OPENAI_CHAT_MODEL_NAME: str = os.getenv("AZURE_OPENAI_CHAT_MODEL_NAME", "gpt-4.1")
+    AZURE_OPENAI_API_KEY: str = ""
+    AZURE_OPENAI_ENDPOINT: str = ""
+    AZURE_OPENAI_DEPLOYMENT_NAME: str = "gpt-4.1"
+    AZURE_OPENAI_CHAT_MODEL_NAME: str = "gpt-4.1"
     AZURE_OPENAI_API_VERSION: str = Field(
         default="2024-02-15-preview",
         validation_alias=AliasChoices("AZURE_OPENAI_API_VERSION", "api_version"),
     )
-    AZURE_OPENAI_COMPLETION_DEPLOYMENT_NAME: str = os.getenv("AZURE_OPENAI_COMPLETION_DEPLOYMENT_NAME", "")
-    AZURE_OPENAI_COMPLETION_MODEL_NAME: str = os.getenv("AZURE_OPENAI_COMPLETION_MODEL_NAME", "gpt-5")
-    AZURE_OPENAI_COMPLETION_API_VERSION: str = os.getenv("AZURE_OPENAI_COMPLETION_API_VERSION", "2024-12-01-preview")
-    AZURE_OPENAI_COMPLETION_ENDPOINT: str = os.getenv("AZURE_OPENAI_COMPLETION_ENDPOINT", "")
+    AZURE_OPENAI_COMPLETION_DEPLOYMENT_NAME: str = ""
+    AZURE_OPENAI_COMPLETION_MODEL_NAME: str = "gpt-5"
+    AZURE_OPENAI_COMPLETION_API_VERSION: str = "2024-12-01-preview"
+    AZURE_OPENAI_COMPLETION_ENDPOINT: str = ""
 
     # Azure ML (AutoML)
-    AZURE_ML_SUBSCRIPTION_ID: str = os.getenv("AZURE_ML_SUBSCRIPTION_ID", "")
-    AZURE_ML_RESOURCE_GROUP: str = os.getenv("AZURE_ML_RESOURCE_GROUP", "")
-    AZURE_ML_WORKSPACE_NAME: str = os.getenv("AZURE_ML_WORKSPACE_NAME", "")
-    AZURE_ML_COMPUTE_NAME: str = os.getenv("AZURE_ML_COMPUTE_NAME", "")
-    AZURE_ML_EXPERIMENT_PREFIX: str = os.getenv("AZURE_ML_EXPERIMENT_PREFIX", "cerebro-automl")
-    AZURE_ML_DATASTORE: str = os.getenv("AZURE_ML_DATASTORE", "")
-    AZURE_ML_STORAGE_ACCOUNT: str = os.getenv("AZURE_ML_STORAGE_ACCOUNT", "")
-    AZURE_ML_TENANT_ID: str = os.getenv("AZURE_ML_TENANT_ID", "")
-    AZURE_ML_CLIENT_ID: str = os.getenv("AZURE_ML_CLIENT_ID", "")
-    AZURE_ML_CLIENT_SECRET: str = os.getenv("AZURE_ML_CLIENT_SECRET", "")
+    AZURE_ML_SUBSCRIPTION_ID: str = ""
+    AZURE_ML_RESOURCE_GROUP: str = ""
+    AZURE_ML_WORKSPACE_NAME: str = ""
+    AZURE_ML_COMPUTE_NAME: str = ""
+    AZURE_ML_EXPERIMENT_PREFIX: str = "cerebro-automl"
+    AZURE_ML_DATASTORE: str = ""
+    AZURE_ML_STORAGE_ACCOUNT: str = ""
+    AZURE_ML_TENANT_ID: str = ""
+    AZURE_ML_CLIENT_ID: str = ""
+    AZURE_ML_CLIENT_SECRET: str = ""
     
     # CORS
     ALLOWED_ORIGINS: List[str] = [

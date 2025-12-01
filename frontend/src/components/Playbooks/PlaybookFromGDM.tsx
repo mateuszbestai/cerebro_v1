@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   Alert,
   Box,
@@ -16,7 +16,7 @@ import LibraryAddCheckIcon from '@mui/icons-material/LibraryAddCheck';
 import { useDispatch, useSelector } from 'react-redux';
 
 import { apiClient, GeneratedPlaybookSummary } from '../../services/api';
-import { GDMResultsResponse } from '../../services/gdmApi';
+import { AutomlTargetRecommendation, GDMResultsResponse } from '../../services/gdmApi';
 import { RootState } from '../../store';
 import { setPlaybooks } from '../../store/playbooksSlice';
 
@@ -24,11 +24,12 @@ interface Props {
   jobId: string;
   results?: GDMResultsResponse;
   onGenerated?: (playbook: GeneratedPlaybookSummary) => void;
+  prefillTarget?: { table?: string; column?: string; task?: string };
 }
 
 const DEFAULT_TASK = 'classification';
 
-const PlaybookFromGDM: React.FC<Props> = ({ jobId, results, onGenerated }) => {
+const PlaybookFromGDM: React.FC<Props> = ({ jobId, results, onGenerated, prefillTarget }) => {
   const dispatch = useDispatch();
   const { playbooks } = useSelector((state: RootState) => state.playbooks);
 
@@ -42,6 +43,56 @@ const PlaybookFromGDM: React.FC<Props> = ({ jobId, results, onGenerated }) => {
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState<GeneratedPlaybookSummary | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  const recommendedTargets = useMemo(
+    () => results?.automl_guidance?.recommended_targets || [],
+    [results?.automl_guidance?.recommended_targets]
+  );
+
+  const businessObjectives = useMemo(() => {
+    const templates: Record<string, string[]> = {
+      'Subscription Lifecycle': [
+        'Predict churn for active subscribers',
+        'Forecast renewals for upcoming periods',
+      ],
+      'Customer 360': [
+        'Upsell probability for existing customers',
+        'Next best offer for active customers',
+      ],
+      'Order to Cash': [
+        'Forecast monthly revenue from orders',
+        'Detect late or risky payments on open orders',
+      ],
+      'Billing & Payments': [
+        'Predict payment failure risk before capture',
+        'Prioritize collections for overdue invoices',
+      ],
+      'Product Catalog': ['Recommend products for active users'],
+      'Support': ['Predict ticket escalation risk', 'Forecast resolution time for new tickets'],
+      'Sales Pipeline': ['Score opportunities for likelihood to close'],
+      'Inventory Management': ['Forecast weekly inventory demand'],
+    };
+
+    const processes = results?.automl_guidance?.business_processes || [];
+    const ideas = new Set<string>();
+
+    processes.forEach((item) => {
+      (templates[item.process] || []).forEach((idea) => ideas.add(idea));
+    });
+
+    recommendedTargets.slice(0, 3).forEach((rec) => {
+      const prefix = rec.task === 'regression' ? 'Forecast' : 'Predict';
+      ideas.add(`${prefix} ${rec.column} for ${rec.table}`);
+    });
+
+    if (ideas.size === 0) {
+      ['Predict churn for active subscribers', 'Forecast weekly revenue', 'Detect anomalous transactions'].forEach(
+        (idea) => ideas.add(idea)
+      );
+    }
+
+    return Array.from(ideas).slice(0, 6);
+  }, [recommendedTargets, results?.automl_guidance?.business_processes]);
 
   const tableOptions = useMemo(() => {
     const nodes = results?.graph?.nodes || [];
@@ -61,9 +112,40 @@ const PlaybookFromGDM: React.FC<Props> = ({ jobId, results, onGenerated }) => {
     return table?.columns || [];
   }, [tableOptions, targetTable]);
 
+  useEffect(() => {
+    if (prefillTarget?.table) {
+      setTargetTable(prefillTarget.table);
+    }
+    if (prefillTarget?.column !== undefined) {
+      setTargetColumn(prefillTarget.column || '');
+    }
+    if (prefillTarget?.task) {
+      setTask(prefillTarget.task);
+    }
+  }, [prefillTarget?.table, prefillTarget?.column, prefillTarget?.task]);
+
+  useEffect(() => {
+    if (!targetTable && recommendedTargets.length) {
+      const primary = recommendedTargets[0];
+      setTargetTable(primary.table);
+      setTargetColumn(primary.column || '');
+      if (primary.task) {
+        setTask(primary.task);
+      }
+    }
+  }, [recommendedTargets, targetTable]);
+
   const handleSelectTable = (value: string) => {
     setTargetTable(value);
     setTargetColumn('');
+  };
+
+  const applyRecommendation = (rec: AutomlTargetRecommendation) => {
+    setTargetTable(rec.table);
+    setTargetColumn(rec.column || '');
+    if (rec.task) {
+      setTask(rec.task);
+    }
   };
 
   const updatePlaybookState = (pb: GeneratedPlaybookSummary) => {
@@ -146,6 +228,43 @@ const PlaybookFromGDM: React.FC<Props> = ({ jobId, results, onGenerated }) => {
           The assistant will use the entities and relationships discovered in job {jobId} to tailor an AutoML
           playbook for your database. Provide a brief objective and optional target hints.
         </Typography>
+
+        {businessObjectives.length > 0 && (
+          <Stack spacing={0.5}>
+            <Typography variant="subtitle2">Try a suggested business objective</Typography>
+            <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+              {businessObjectives.map((idea) => (
+                <Chip
+                  key={idea}
+                  label={idea}
+                  onClick={() => setUseCase(idea)}
+                  variant="outlined"
+                  color="secondary"
+                />
+              ))}
+            </Stack>
+          </Stack>
+        )}
+
+        {recommendedTargets.length > 0 && (
+          <Stack spacing={0.5}>
+            <Typography variant="subtitle2">Suggested targets from your data</Typography>
+            <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+              {recommendedTargets.slice(0, 3).map((rec) => (
+                <Chip
+                  key={`${rec.table}-${rec.column}-${rec.task}`}
+                  label={`${rec.table}.${rec.column} · ${rec.task}`}
+                  onClick={() => applyRecommendation(rec)}
+                  color="secondary"
+                  variant="outlined"
+                />
+              ))}
+            </Stack>
+            <Typography variant="caption" color="text.secondary">
+              {recommendedTargets[0]?.reason}
+            </Typography>
+          </Stack>
+        )}
 
         {success && (
           <Alert

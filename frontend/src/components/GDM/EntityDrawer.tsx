@@ -34,7 +34,7 @@ const EntityDrawer: React.FC<EntityDrawerProps> = ({ entity, onClose, onPreviewJ
         <Box sx={{ p: 3, display: 'flex', flexDirection: 'column', gap: 2, height: '100%' }}>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <Box>
-              <Typography variant="overline" sx={{ color: 'var(--text-muted)', letterSpacing: '0.2em' }}>
+              <Typography variant="overline" color="text.secondary" sx={{ letterSpacing: '0.2em' }}>
                 ENTITY
               </Typography>
               <Typography variant="h5">{entity.label}</Typography>
@@ -53,6 +53,9 @@ const EntityDrawer: React.FC<EntityDrawerProps> = ({ entity, onClose, onPreviewJ
             {typeof entity.row_count === 'number' && (
               <Chip label={`${entity.row_count.toLocaleString()} rows`} variant="outlined" />
             )}
+            {entity.business_process && (
+              <Chip label={entity.business_process} color="secondary" variant="outlined" size="small" />
+            )}
           </Stack>
 
           <Button
@@ -65,6 +68,12 @@ const EntityDrawer: React.FC<EntityDrawerProps> = ({ entity, onClose, onPreviewJ
             Preview in JSON
           </Button>
 
+          {entity.feature_time && (
+            <Typography variant="caption" color="text.secondary">
+              Feature availability anchored on {entity.feature_time.column} ({entity.feature_time.reason})
+            </Typography>
+          )}
+
           <Divider />
 
           <Typography variant="subtitle2">Columns</Typography>
@@ -72,11 +81,23 @@ const EntityDrawer: React.FC<EntityDrawerProps> = ({ entity, onClose, onPreviewJ
             {entity.columns.map((column) => (
               <ListItem
                 key={column.name}
-                secondaryAction={column.is_primary_key ? <Chip size="small" label="PK" color="success" /> : null}
+                secondaryAction={
+                  <Stack direction="row" spacing={0.5}>
+                    {column.semantic_type && (
+                      <Chip size="small" label={column.semantic_type} variant="outlined" />
+                    )}
+                    {column.is_primary_key ? <Chip size="small" label="PK" color="success" /> : null}
+                  </Stack>
+                }
               >
                 <ListItemText
                   primary={column.name}
-                  secondary={`${column.type || 'unknown'}${column.nullable ? ' · nullable' : ''}`}
+                  secondary={
+                    <>
+                      {`${column.type || 'unknown'}${column.nullable ? ' · nullable' : ''}`}
+                      {column.semantic_description ? ` · ${column.semantic_description}` : ''}
+                    </>
+                  }
                 />
               </ListItem>
             ))}

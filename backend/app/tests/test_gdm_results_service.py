@@ -131,3 +131,17 @@ def test_use_for_ai_state_persists(seeded_service):
     service.set_use_for_ai(job_id, True)
     state = service.get_use_for_ai(job_id)
     assert state and state["enabled"] is True
+
+
+def test_results_include_automl_guidance(seeded_service):
+    service, job_id = seeded_service
+    payload = service.get_results(job_id)
+    guidance = payload.get("automl_guidance")
+    assert guidance is not None
+    assert guidance["recommended_targets"]
+    rec = guidance["recommended_targets"][0]
+    assert rec["table"] == "dbo.fact_orders"
+    assert rec["task"] in {"regression", "classification"}
+    assert guidance["feature_availability"]
+    node = next(node for node in payload["graph"]["nodes"] if node["name"] == "fact_orders")
+    assert any(col.get("semantic_type") for col in node["columns"])
