@@ -51,6 +51,11 @@ BUSINESS_PROCESS_HINTS: Sequence[Tuple[str, str]] = (
     ("opportunity", "Sales Pipeline"),
 )
 
+# Minimum requirements for AutoML
+MIN_ROWS_FOR_AUTOML = 100
+MIN_FEATURES_FOR_AUTOML = 3
+IMBALANCE_THRESHOLD = 0.9  # Class is imbalanced if > 90% or < 10%
+
 
 def _table_id(entity: Dict[str, Any]) -> str:
     return f"{entity['schema']}.{entity['name']}"
@@ -205,6 +210,167 @@ def _feature_suggestions(
     }
 
 
+def _compute_column_quality(
+    column: Dict[str, Any],
+    profile_data: Optional[Dict[str, Any]],
+) -> Dict[str, Any]:
+    """Compute data quality metrics for a column from profile samples."""
+    quality: Dict[str, Any] = {
+        "null_pct": None,
+        "cardinality": None,
+        "cardinality_ratio": None,
+        "sample_stats": None,
+    }
+
+    if not profile_data:
+        return quality
+
+    sample_rows = profile_data.get("sample_rows", [])
+    if not sample_rows:
+        return quality
+
+    col_name = column["name"]
+    values = [row.get(col_name) for row in sample_rows if col_name in row]
+
+    if not values:
+        return quality
+
+    # Calculate null percentage
+    null_count = sum(1 for v in values if v is None)
+    quality["null_pct"] = round(null_count / len(values), 3) if values else None
+
+    # Calculate cardinality
+    non_null_values = [v for v in values if v is not None]
+    if non_null_values:
+        unique_values = set(str(v) for v in non_null_values)
+        quality["cardinality"] = len(unique_values)
+        quality["cardinality_ratio"] = round(len(unique_values) / len(non_null_values), 3)
+
+        # Sample statistics based on data type
+        dtype = (column.get("type") or "").lower()
+        if dtype in NUMERIC_TYPES:
+            try:
+                numeric_vals = [float(v) for v in non_null_values if v is not None]
+                if numeric_vals:
+                    quality["sample_stats"] = {
+                        "min": round(min(numeric_vals), 2),
+                        "max": round(max(numeric_vals), 2),
+                        "mean": round(sum(numeric_vals) / len(numeric_vals), 2),
+                    }
+            except (ValueError, TypeError):
+                pass
+        elif dtype in TEXT_TYPES or quality["cardinality_ratio"] and quality["cardinality_ratio"] < 0.5:
+            # Categorical - show top values
+            from collections import Counter
+            value_counts = Counter(str(v) for v in non_null_values)
+            top_values = value_counts.most_common(5)
+            total = len(non_null_values)
+            quality["sample_stats"] = {
+                "top_values": [
+                    {"value": val, "pct": round(count / total, 3)}
+                    for val, count in top_values
+                ]
+            }
+
+    return quality
+
+
+def _compute_target_warnings(
+    entity: Dict[str, Any],
+    column: Dict[str, Any],
+    task: str,
+    profile_data: Optional[Dict[str, Any]],
+) -> Optional[Dict[str, Any]]:
+    """Generate warnings about potential issues with using this column as a target."""
+    warnings = []
+    severity = "low"
+
+    row_count = entity.get("row_count") or 0
+    quality = column.get("quality", {})
+
+    # Check minimum rows
+    if row_count > 0 and row_count < MIN_ROWS_FOR_AUTOML:
+        warnings.append(f"Only {row_count} rows - minimum {MIN_ROWS_FOR_AUTOML} recommended for AutoML")
+        severity = "high"
+
+    # Check null percentage
+    null_pct = quality.get("null_pct")
+    if null_pct is not None and null_pct > 0.3:
+        warnings.append(f"High null rate ({null_pct:.0%}) - may need imputation")
+        severity = "medium" if severity != "high" else severity
+
+    # Check class imbalance for classification
+    if task == "classification" and profile_data:
+        sample_stats = quality.get("sample_stats", {})
+        top_values = sample_stats.get("top_values", [])
+        if top_values and len(top_values) >= 1:
+            max_pct = top_values[0].get("pct", 0)
+            if max_pct > IMBALANCE_THRESHOLD:
+                warnings.append(
+                    f"Class imbalance detected ({max_pct:.0%} in majority class) - consider class weights"
+                )
+                severity = "medium" if severity != "high" else severity
+
+    # Check cardinality for classification
+    cardinality = quality.get("cardinality")
+    if task == "classification" and cardinality:
+        if cardinality > 50:
+            warnings.append(f"High cardinality ({cardinality} classes) - consider grouping rare classes")
+            severity = "medium" if severity != "high" else severity
+        elif cardinality < 2:
+            warnings.append("Only 1 class detected - cannot train classifier")
+            severity = "high"
+
+    if not warnings:
+        return None
+
+    return {
+        "table": _table_id(entity),
+        "column": column["name"],
+        "warnings": warnings,
+        "severity": severity,
+    }
+
+
+def _compute_data_readiness(
+    entities: List[Dict[str, Any]],
+    recommended_targets: List[Dict[str, Any]],
+) -> Dict[str, Any]:
+    """Assess overall data readiness for AutoML."""
+    total_rows = sum(e.get("row_count") or 0 for e in entities)
+    total_features = sum(
+        len([c for c in e.get("columns", []) if c.get("semantic_type") not in {"primary_key", "foreign_key"}])
+        for e in entities
+    )
+
+    sufficient_rows = total_rows >= MIN_ROWS_FOR_AUTOML
+    sufficient_features = total_features >= MIN_FEATURES_FOR_AUTOML
+    has_target_candidates = len(recommended_targets) > 0
+
+    if sufficient_rows and sufficient_features and has_target_candidates:
+        recommendation = "Ready for AutoML"
+        status = "ready"
+    elif not has_target_candidates:
+        recommendation = "No suitable target columns detected - review data for prediction objectives"
+        status = "review_needed"
+    elif not sufficient_rows:
+        recommendation = f"Need more data - only {total_rows} rows (minimum {MIN_ROWS_FOR_AUTOML})"
+        status = "insufficient_data"
+    else:
+        recommendation = "Review data quality before proceeding"
+        status = "review_needed"
+
+    return {
+        "status": status,
+        "sufficient_rows": sufficient_rows,
+        "sufficient_features": sufficient_features,
+        "has_target_candidates": has_target_candidates,
+        "total_rows": total_rows,
+        "total_features": total_features,
+        "recommendation": recommendation,
+    }
+
+
 def prepare_automl_metadata(
     metadata: Dict[str, Any],
     relationships: List[Dict[str, Any]],
@@ -223,6 +389,7 @@ def prepare_automl_metadata(
     kpi_columns: List[Dict[str, Any]] = []
     feature_suggestions: List[Dict[str, Any]] = []
     recommended_targets: List[Dict[str, Any]] = []
+    target_warnings: List[Dict[str, Any]] = []
 
     for entity in entities:
         table = _table_id(entity)
@@ -231,17 +398,25 @@ def prepare_automl_metadata(
             entity["business_process"] = process["process"]
             business_processes.append({"table": table, **process})
 
+        # Get profile data for this table
+        profile_data = profiles.get(table)
+
         for column in entity.get("columns", []):
             is_fk = (table, column["name"]) in foreign_keys
             semantic = _semantic_type(column, is_fk)
             column["semantic_type"] = semantic
             column["semantic_description"] = _semantic_description(semantic, column["name"])
+
+            # Add data quality metrics
+            column["quality"] = _compute_column_quality(column, profile_data)
+
             semantic_columns.append(
                 {
                     "table": table,
                     "column": column["name"],
                     "semantic_type": semantic,
                     "description": column.get("semantic_description"),
+                    "quality": column["quality"],
                 }
             )
 
@@ -266,6 +441,12 @@ def prepare_automl_metadata(
                 )
             candidate = _target_recommendation(entity, column, semantic, feature_time)
             if candidate:
+                # Check for target warnings
+                warning = _compute_target_warnings(entity, column, candidate["task"], profile_data)
+                if warning:
+                    target_warnings.append(warning)
+                    candidate["has_warnings"] = True
+
                 entity_targets.append(candidate)
                 recommended_targets.append(candidate)
 
@@ -286,6 +467,9 @@ def prepare_automl_metadata(
         for candidate in entity.get("target_recommendations", []):
             candidate.pop("_score", None)
 
+    # Compute overall data readiness
+    data_readiness = _compute_data_readiness(entities, recommended_targets)
+
     guidance = {
         "recommended_targets": recommended_targets[:10],
         "feature_availability": feature_availability,
@@ -293,5 +477,7 @@ def prepare_automl_metadata(
         "kpi_columns": kpi_columns,
         "feature_suggestions": feature_suggestions,
         "semantic_columns": semantic_columns,
+        "target_warnings": target_warnings,
+        "data_readiness": data_readiness,
     }
     return entities, guidance

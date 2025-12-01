@@ -70,9 +70,9 @@ const renderFeatureAvailability = (items: FeatureAvailabilityHint[], label: stri
       {label}
     </Typography>
     <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
-      {items.slice(0, 8).map((item) => (
+      {items.slice(0, 8).map((item, index) => (
         <Chip
-          key={`${label}-${item.column}-${item.reason}`}
+          key={`${label}-${item.table || 'unknown'}-${item.column}-${index}`}
           label={`${item.table ? `${item.table}.` : ''}${item.column} · ${item.reason}`}
           size="small"
           color="secondary"

@@ -20,6 +20,7 @@ import {
   Settings as SettingsIcon,
   Help as HelpIcon,
   Bolt as BoltIcon,
+  AccountTree as GDMIcon,
 } from '@mui/icons-material';
 import { useNavigate, useLocation } from 'react-router-dom';
 
@@ -71,6 +72,7 @@ const navigationVariants: Record<NavigationVariant, NavigationConfig> = {
         label: 'Assistant Suite',
         items: [
           { text: 'Chat Workspace', icon: <ChatIcon />, path: '/solutions/db', chip: 'AI' },
+          { text: 'GDM Results', icon: <GDMIcon />, path: '/solutions/gdm' },
           { text: 'Schema Explorer', icon: <DatabaseIcon />, path: '/database' },
           { text: 'Visualizations', icon: <TimelineIcon />, path: '/visualizations' },
         ],
@@ -91,6 +93,7 @@ const navigationVariants: Record<NavigationVariant, NavigationConfig> = {
         items: [
           { text: 'Solutions Hub', icon: <RocketIcon />, path: '/' },
           { text: 'Database Assistant', icon: <ChatIcon />, path: '/solutions/db', chip: 'AI' },
+          { text: 'GDM Results', icon: <GDMIcon />, path: '/solutions/gdm' },
           { text: 'Real-Time Preview', icon: <BoltIcon />, path: '/solutions/realtime' },
           { text: 'Reports', icon: <ReportIcon />, path: '/reports' },
           { text: 'Database', icon: <DatabaseIcon />, path: '/database' },

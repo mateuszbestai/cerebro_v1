@@ -54,7 +54,12 @@ class Settings(BaseSettings):
     AZURE_ML_TENANT_ID: str = ""
     AZURE_ML_CLIENT_ID: str = ""
     AZURE_ML_CLIENT_SECRET: str = ""
-    
+
+    # AutoGluon (Local AutoML)
+    AUTOGLUON_OUTPUT_DIR: str = ""  # Override default output directory
+    AUTOGLUON_DEFAULT_PRESET: str = "balanced"  # quick, balanced, thorough
+    AUTOGLUON_MAX_TIME_LIMIT: int = 7200  # Maximum allowed time limit (2 hours)
+
     # CORS
     ALLOWED_ORIGINS: List[str] = [
         "http://localhost:3000",

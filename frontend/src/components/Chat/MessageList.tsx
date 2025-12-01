@@ -2,6 +2,7 @@ import React from 'react';
 import { Box, List } from '@mui/material';
 import { alpha, useTheme } from '@mui/material/styles';
 import Message from './Message';
+import SystemMessage from './SystemMessage';
 import { Message as MessageType } from '../../types';
 
 interface MessageListProps {
@@ -17,6 +18,10 @@ const MessageList: React.FC<MessageListProps> = ({ messages }) => {
     ? alpha(theme.palette.common.white, 0.08)
     : theme.palette.grey[200];
 
+  const isSystemMessage = (message: MessageType): boolean => {
+    return message.metadata?.is_system_message === true || message.role === 'system';
+  };
+
   return (
     <Box
       sx={{
@@ -29,7 +34,11 @@ const MessageList: React.FC<MessageListProps> = ({ messages }) => {
     >
       <List sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
         {messages.map((message) => (
-          <Message key={message.id} message={message} />
+          isSystemMessage(message) ? (
+            <SystemMessage key={message.id} message={message} />
+          ) : (
+            <Message key={message.id} message={message} />
+          )
         ))}
       </List>
     </Box>

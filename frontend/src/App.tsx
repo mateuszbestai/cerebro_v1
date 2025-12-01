@@ -17,6 +17,7 @@ import VisualizationsDashboard from './components/Visualizations/VisualizationsD
 import SolutionsHub from './pages/SolutionsHub';
 import RealTimePreview from './pages/RealTimePreview';
 import GDMResults from './pages/GDMResults';
+import AutoMLPage from './pages/AutoMLPage';
 
 // Contexts
 import { DatabaseProvider } from './contexts/DatabaseContext';
@@ -70,6 +71,7 @@ function AppContent() {
         <Route path="/solutions/db" element={<ChatInterface />} />
         <Route path="/solutions/realtime" element={<RealTimePreview />} />
         <Route path="/solutions/gdm/:jobId/results" element={<GDMResults />} />
+        <Route path="/solutions/automl" element={<AutoMLPage />} />
         <Route path="/database" element={<TablesDashboard />} />
         <Route path="/reports" element={<ReportViewer />} />
         <Route path="/visualizations" element={<VisualizationsDashboard />} />

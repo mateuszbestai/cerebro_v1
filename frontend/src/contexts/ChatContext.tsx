@@ -14,6 +14,8 @@ interface ChatSession {
   selectedTables: string[];
 }
 
+export type SystemMessageType = 'info' | 'success' | 'warning' | 'error' | 'automl_complete' | 'forecast_ready';
+
 interface ChatContextType {
   currentSessionId: string;
   sessions: ChatSession[];
@@ -33,6 +35,7 @@ interface ChatContextType {
   connectWebSocket: () => void;
   disconnectWebSocket: () => void;
   stopGeneration: () => void;
+  addSystemMessage: (content: string, type: SystemMessageType, metadata?: Record<string, any>) => void;
 }
 
 const ChatContext = createContext<ChatContextType | undefined>(undefined);
@@ -213,6 +216,21 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
 
   const disconnectWebSocket = useCallback(() => { if (wsConnectionRef.current) { apiClient.closeWebSocket(); wsConnectionRef.current = null; setIsConnected(false); } }, []);
 
+  const addSystemMessage = useCallback((content: string, type: SystemMessageType, metadata?: Record<string, any>) => {
+    const systemMessage: Message = {
+      id: `sys_${Date.now()}`,
+      role: 'system' as any,
+      content,
+      timestamp: new Date().toISOString(),
+      metadata: {
+        ...metadata,
+        system_type: type,
+        is_system_message: true,
+      },
+    } as any;
+    saveSessionMessages(prev => [...prev, systemMessage]);
+  }, [saveSessionMessages]);
+
   useEffect(() => {
     if (messages.length > 0) return;
     const loadHistory = async () => {
@@ -229,7 +247,7 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
   }, []);
 
   return (
-    <ChatContext.Provider value={{ currentSessionId, sessions, messages, isLoading, currentAnalysis, error, sendMessage, clearMessages, deleteMessage, retryLastMessage, exportChat, newSession, switchSession, renameSession, isConnected, connectWebSocket, disconnectWebSocket, stopGeneration }}>
+    <ChatContext.Provider value={{ currentSessionId, sessions, messages, isLoading, currentAnalysis, error, sendMessage, clearMessages, deleteMessage, retryLastMessage, exportChat, newSession, switchSession, renameSession, isConnected, connectWebSocket, disconnectWebSocket, stopGeneration, addSystemMessage }}>
       {children}
     </ChatContext.Provider>
   );

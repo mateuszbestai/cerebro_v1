@@ -89,3 +89,6 @@ export interface AutoMLJobStatus {
   summary?: string;
   error?: string;
 }
+
+// Re-export AutoML types
+export * from './automl';

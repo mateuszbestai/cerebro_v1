@@ -543,6 +543,76 @@ async def execute_query(connection_id: str, request: QueryRequest):
     """API route wrapper that delegates to internal executor"""
     return await execute_query_internal(connection_id, request.query, request.limit)
 
+@router.get("/preview")
+async def get_table_preview(
+    connection_id: str,
+    table_name: str,
+    schema_name: str = "dbo",
+    limit: int = 100
+):
+    """Get a preview of table data with column information"""
+    if connection_id not in active_connections:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Connection not found"
+        )
+
+    try:
+        engine = active_connections[connection_id]["engine"]
+
+        with engine.connect() as conn:
+            # Get total row count
+            count_query = text(f"SELECT COUNT(*) FROM [{schema_name}].[{table_name}]")
+            total_rows = conn.execute(count_query).scalar()
+
+            # Get preview data
+            preview_query = text(f"SELECT TOP {limit} * FROM [{schema_name}].[{table_name}]")
+            result = conn.execute(preview_query)
+
+            rows = result.fetchall()
+            columns = list(result.keys())
+            data = [dict(row._mapping) for row in rows]
+
+            # Get column data types
+            dtypes = {}
+            for col in columns:
+                # Infer dtype from first non-null value
+                for row in data:
+                    value = row.get(col)
+                    if value is not None:
+                        dtype = type(value).__name__
+                        if dtype == 'int':
+                            dtypes[col] = 'int64'
+                        elif dtype == 'float':
+                            dtypes[col] = 'float64'
+                        elif dtype == 'str':
+                            dtypes[col] = 'object'
+                        elif dtype == 'datetime':
+                            dtypes[col] = 'datetime64'
+                        elif dtype == 'bool':
+                            dtypes[col] = 'bool'
+                        else:
+                            dtypes[col] = 'object'
+                        break
+                else:
+                    # All values are null
+                    dtypes[col] = 'object'
+
+            return {
+                "rows": data,
+                "columns": columns,
+                "dtypes": dtypes,
+                "total_rows": total_rows,
+                "preview_limit": limit
+            }
+
+    except Exception as e:
+        logger.error(f"Error getting table preview: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e)
+        )
+
 def build_connection_string(request: ConnectionRequest) -> str:
     """Build SQL Server connection string
     Use explicit ODBC connection string via odbc_connect to ensure FreeTDS compatibility
