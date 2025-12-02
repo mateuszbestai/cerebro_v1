@@ -18,6 +18,7 @@ import {
   Refresh as RefreshIcon,
   Info as InfoIcon,
   Close as CloseIcon,
+  UploadFile as UploadIcon,
 } from '@mui/icons-material';
 import { useDatabase } from '../../contexts/DatabaseContext';
 import { alpha, useTheme } from '@mui/material/styles';
@@ -34,6 +35,9 @@ const DatabaseStatus: React.FC<DatabaseStatusProps> = ({ onConnect }) => {
     databaseInfo, 
     tables, 
     selectedTables,
+    activeSource,
+    csvDataset,
+    clearCsvDataset,
     disconnect,
     refreshTables 
   } = useDatabase();
@@ -61,6 +65,52 @@ const DatabaseStatus: React.FC<DatabaseStatusProps> = ({ onConnect }) => {
     if (error) return 'Connection Failed';
     return 'Not Connected';
   };
+
+  if (activeSource === 'csv' && csvDataset && !isConnected) {
+    return (
+      <Paper
+        elevation={0}
+        sx={{
+          m: 2,
+          mb: 0,
+          p: 2,
+          borderRadius: 'var(--radius)',
+          border: '1px dashed rgba(118,185,0,0.35)',
+          background: 'rgba(26, 31, 30, 0.65)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: 2,
+        }}
+      >
+        <Box display="flex" alignItems="center" gap={2}>
+          <UploadIcon color="secondary" />
+          <Box>
+            <Typography variant="subtitle2" sx={{ color: 'var(--text)', mb: 0.5 }}>
+              CSV dataset loaded
+            </Typography>
+            <Typography variant="body2" sx={{ color: 'var(--text-dim)' }}>
+              {csvDataset.name} • {csvDataset.columns.length} columns • ~{csvDataset.rowCount} rows
+            </Typography>
+          </Box>
+        </Box>
+        <Box display="flex" alignItems="center" gap={1}>
+          <Button size="small" variant="text" color="secondary" onClick={clearCsvDataset}>
+            Remove CSV
+          </Button>
+          <Button
+            size="small"
+            variant="contained"
+            onClick={onConnect}
+            startIcon={<AddIcon />}
+            disabled={isConnecting}
+          >
+            Connect Database
+          </Button>
+        </Box>
+      </Paper>
+    );
+  }
 
   if (!isConnected && !error && !isConnecting) {
     return (

@@ -1,63 +1,54 @@
-/**
- * AutoML Page
- *
- * Main page for the AutoML wizard interface.
- * Can be accessed directly or from GDM results.
- */
-
-import React from 'react';
-import { Box, Container, Typography, Paper, Breadcrumbs, Link } from '@mui/material';
-import { Link as RouterLink, useSearchParams } from 'react-router-dom';
-import HomeIcon from '@mui/icons-material/Home';
+import React, { useEffect } from 'react';
+import { Box, Container, Typography, Chip } from '@mui/material';
+import { useSearchParams } from 'react-router-dom';
 import AutoGraphIcon from '@mui/icons-material/AutoGraph';
+import { AssistantProvider, useAssistant } from '../contexts/AssistantContext';
+import PlaybookFlow from '../components/AutoML/PlaybookFlow';
+import { loadLastGdmJob } from '../utils/gdmStorage';
 
-import { AutoMLWizard } from '../components/AutoML';
-
-const AutoMLPage: React.FC = () => {
+const AutoMLSuiteContent: React.FC = () => {
   const [searchParams] = useSearchParams();
-  const gdmJobId = searchParams.get('gdmJobId') || undefined;
+  const { setGdmJobId } = useAssistant();
+
+  useEffect(() => {
+    const gdmFromQuery = searchParams.get('gdmJobId');
+    const last = loadLastGdmJob();
+    if (gdmFromQuery) {
+      setGdmJobId(gdmFromQuery);
+    } else if (last?.jobId) {
+      setGdmJobId(last.jobId);
+    }
+  }, [searchParams, setGdmJobId]);
 
   return (
     <Container maxWidth="lg" sx={{ py: 3 }}>
-      {/* Breadcrumbs */}
-      <Breadcrumbs sx={{ mb: 2 }}>
-        <Link
-          component={RouterLink}
-          to="/"
-          sx={{ display: 'flex', alignItems: 'center' }}
-          color="inherit"
-          underline="hover"
-        >
-          <HomeIcon sx={{ mr: 0.5 }} fontSize="small" />
-          Home
-        </Link>
-        <Typography color="text.primary" sx={{ display: 'flex', alignItems: 'center' }}>
-          <AutoGraphIcon sx={{ mr: 0.5 }} fontSize="small" />
-          AutoML
-        </Typography>
-      </Breadcrumbs>
-
-      {/* Page Header */}
-      <Box sx={{ mb: 3 }}>
-        <Typography variant="h4" gutterBottom>
-          AutoML Wizard
-        </Typography>
-        <Typography variant="body1" color="text.secondary">
-          Build machine learning models without writing code. Our AI will analyze your data and train the best model for your use case.
-        </Typography>
+      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 3, gap: 2 }}>
+        <Box>
+          <Typography variant="overline" color="text.secondary" sx={{ letterSpacing: '0.2em' }}>
+            ASSISTANT SUITE
+          </Typography>
+          <Typography variant="h4">Playbook-driven AutoML</Typography>
+          <Typography variant="body2" color="text.secondary">
+            Select a Global Data Model recommendation, review the playbook, validate for leakage, and run AutoGluon with business-ready outputs.
+          </Typography>
+        </Box>
+        <Chip
+          icon={<AutoGraphIcon />}
+          label="Powered by AutoGluon"
+          color="success"
+          variant="outlined"
+        />
       </Box>
 
-      {/* Wizard Container */}
-      <Paper elevation={1} sx={{ p: 0 }}>
-        <AutoMLWizard
-          gdmJobId={gdmJobId}
-          onComplete={(jobId) => {
-            console.log('AutoML completed:', jobId);
-          }}
-        />
-      </Paper>
+      <PlaybookFlow />
     </Container>
   );
 };
+
+const AutoMLPage: React.FC = () => (
+  <AssistantProvider>
+    <AutoMLSuiteContent />
+  </AssistantProvider>
+);
 
 export default AutoMLPage;

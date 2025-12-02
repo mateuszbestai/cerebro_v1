@@ -24,17 +24,6 @@ export const solutions: SolutionConfig[] = [
     tags: ['blueprint', 'database', 'analysis'],
   },
   {
-    id: 'automl-wizard',
-    title: 'AutoML Wizard',
-    subtitle: 'Build ML models without code',
-    state: 'available',
-    badge: 'NEW',
-    image:
-      'linear-gradient(135deg, rgba(156, 39, 176, 0.35) 0%, rgba(118, 185, 0, 0.18) 50%, rgba(11, 15, 13, 0.85) 100%)',
-    route: '/solutions/automl',
-    tags: ['automl', 'machine-learning', 'no-code'],
-  },
-  {
     id: 'realtime-rag',
     title: 'Real-Time Data Analysis',
     subtitle: 'Connect real-time data to a RAG solution',

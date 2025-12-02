@@ -29,7 +29,7 @@ import { ModelProvider } from './contexts/ModelContext';
 import { useDatabase } from './contexts/DatabaseContext';
 
 function AppContent() {
-  const { isConnected } = useDatabase();
+  const { isConnected, activeSource } = useDatabase();
   const location = useLocation();
   const isDatabaseExperience =
     location.pathname.startsWith('/solutions/db') || location.pathname.startsWith('/database');
@@ -43,14 +43,14 @@ function AppContent() {
     }
 
     // Show connection dialog on first visit to the database experience
-    if (!isConnected && showWelcome) {
+    if (!isConnected && showWelcome && activeSource !== 'csv') {
       const timer = setTimeout(() => {
         setConnectionDialogOpen(true);
         setShowWelcome(false);
       }, 1000);
       return () => clearTimeout(timer);
     }
-  }, [isConnected, showWelcome, isDatabaseExperience]);
+  }, [isConnected, showWelcome, isDatabaseExperience, activeSource]);
 
 
   return (
@@ -68,8 +68,12 @@ function AppContent() {
       {/* Main Routes */}
       <Routes>
         <Route path="/" element={<SolutionsHub />} />
-        <Route path="/solutions/db" element={<ChatInterface />} />
+        <Route
+          path="/solutions/db"
+          element={<ChatInterface onOpenConnectionDialog={() => setConnectionDialogOpen(true)} />}
+        />
         <Route path="/solutions/realtime" element={<RealTimePreview />} />
+        <Route path="/solutions/gdm" element={<GDMResults />} />
         <Route path="/solutions/gdm/:jobId/results" element={<GDMResults />} />
         <Route path="/solutions/automl" element={<AutoMLPage />} />
         <Route path="/database" element={<TablesDashboard />} />

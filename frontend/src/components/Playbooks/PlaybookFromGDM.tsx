@@ -294,14 +294,21 @@ const PlaybookFromGDM: React.FC<Props> = ({ jobId, results, onGenerated, prefill
           <Grid item xs={12} md={6}>
             <TextField
               select
-              label="Task type"
+              label="Problem type"
               value={task}
               onChange={(e) => setTask(e.target.value)}
               fullWidth
+              helperText="Select the type of ML problem to solve"
             >
-              {['classification', 'regression', 'forecasting'].map((option) => (
-                <MenuItem key={option} value={option}>
-                  {option}
+              {[
+                { value: 'classification', label: 'Classification - Predict categories' },
+                { value: 'regression', label: 'Regression - Predict numbers' },
+                { value: 'forecasting', label: 'Forecasting - Predict time series' },
+                { value: 'clustering', label: 'Clustering - Group similar records' },
+                { value: 'anomaly', label: 'Anomaly - Detect outliers' },
+              ].map((option) => (
+                <MenuItem key={option.value} value={option.value}>
+                  {option.label}
                 </MenuItem>
               ))}
             </TextField>
@@ -350,14 +357,43 @@ const PlaybookFromGDM: React.FC<Props> = ({ jobId, results, onGenerated, prefill
               value={metric}
               onChange={(e) => setMetric(e.target.value)}
               fullWidth
+              helperText={task === 'clustering' || task === 'anomaly' ? 'Auto-selected based on task' : undefined}
             >
-              {['AUC_weighted', 'accuracy', 'f1_score_weighted', 'r2_score', 'normalized_root_mean_squared_error'].map(
-                (opt) => (
-                  <MenuItem key={opt} value={opt}>
-                    {opt}
-                  </MenuItem>
-                )
-              )}
+              {task === 'classification' && [
+                { value: 'accuracy', label: 'Accuracy' },
+                { value: 'balanced_accuracy', label: 'Balanced Accuracy' },
+                { value: 'f1_weighted', label: 'F1 Score (Weighted)' },
+                { value: 'AUC_weighted', label: 'AUC (Weighted)' },
+                { value: 'log_loss', label: 'Log Loss' },
+              ].map((opt) => (
+                <MenuItem key={opt.value} value={opt.value}>{opt.label}</MenuItem>
+              ))}
+              {task === 'regression' && [
+                { value: 'r2', label: 'R² Score' },
+                { value: 'rmse', label: 'RMSE' },
+                { value: 'mae', label: 'MAE' },
+                { value: 'mape', label: 'MAPE' },
+              ].map((opt) => (
+                <MenuItem key={opt.value} value={opt.value}>{opt.label}</MenuItem>
+              ))}
+              {task === 'forecasting' && [
+                { value: 'MASE', label: 'MASE (Mean Absolute Scaled Error)' },
+                { value: 'MAPE', label: 'MAPE (Mean Absolute Percentage Error)' },
+                { value: 'RMSE', label: 'RMSE (Root Mean Square Error)' },
+                { value: 'MAE', label: 'MAE (Mean Absolute Error)' },
+              ].map((opt) => (
+                <MenuItem key={opt.value} value={opt.value}>{opt.label}</MenuItem>
+              ))}
+              {task === 'clustering' && [
+                { value: 'silhouette', label: 'Silhouette Score' },
+              ].map((opt) => (
+                <MenuItem key={opt.value} value={opt.value}>{opt.label}</MenuItem>
+              ))}
+              {task === 'anomaly' && [
+                { value: 'auc_roc', label: 'AUC-ROC' },
+              ].map((opt) => (
+                <MenuItem key={opt.value} value={opt.value}>{opt.label}</MenuItem>
+              ))}
             </TextField>
           </Grid>
           <Grid item xs={6} md={4}>

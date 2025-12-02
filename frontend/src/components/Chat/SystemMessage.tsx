@@ -28,6 +28,7 @@ import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
 import { Message as MessageType } from '../../types';
 import { SystemMessageType } from '../../contexts/ChatContext';
 import { useAssistant } from '../../contexts/AssistantContext';
+import { useNavigate } from 'react-router-dom';
 
 interface SystemMessageProps {
   message: MessageType;
@@ -35,9 +36,18 @@ interface SystemMessageProps {
 
 const SystemMessage: React.FC<SystemMessageProps> = ({ message }) => {
   const theme = useTheme();
-  const { setActiveTab } = useAssistant();
+  const navigate = useNavigate();
+  const { setAutomlJobId, setAutomlStatus } = useAssistant();
 
   const systemType = (message.metadata?.system_type as SystemMessageType) || 'info';
+
+  const goToAutomlSuite = () => {
+    if (message.metadata?.job_id) {
+      setAutomlJobId(message.metadata.job_id);
+      setAutomlStatus('completed');
+    }
+    navigate('/solutions/automl');
+  };
 
   // Get icon and color based on type
   const getTypeConfig = () => {
@@ -49,7 +59,7 @@ const SystemMessage: React.FC<SystemMessageProps> = ({ message }) => {
           bgcolor: alpha(theme.palette.success.main, theme.palette.mode === 'dark' ? 0.15 : 0.08),
           title: 'AutoML Training Complete',
           action: 'View Results',
-          onAction: () => setActiveTab('forecasts'),
+          onAction: goToAutomlSuite,
         };
       case 'forecast_ready':
         return {
@@ -58,7 +68,7 @@ const SystemMessage: React.FC<SystemMessageProps> = ({ message }) => {
           bgcolor: alpha(theme.palette.info.main, theme.palette.mode === 'dark' ? 0.15 : 0.08),
           title: 'AI Insights Ready',
           action: 'View Insights',
-          onAction: () => setActiveTab('forecasts'),
+          onAction: goToAutomlSuite,
         };
       case 'success':
         return {

@@ -74,7 +74,18 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
   const wsConnectionRef = useRef<WebSocket | null>(null);
   const lastMessageRef = useRef<string>('');
   
-  const { connectionId, getTableContext, executeQuery, selectedTables, databaseInfo, tables, setSelectedTables } = useDatabase();
+  const {
+    connectionId,
+    getTableContext,
+    executeQuery,
+    selectedTables,
+    databaseInfo,
+    tables,
+    setSelectedTables,
+    activeSource,
+    csvDataset,
+    csvSampleLimit,
+  } = useDatabase();
 
   useEffect(() => { localStorage.setItem('chat_sessions', JSON.stringify(sessions)); }, [sessions]);
   useEffect(() => { localStorage.setItem('chat_current_session_id', currentSessionId); }, [currentSessionId]);
@@ -116,7 +127,10 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
 
     try {
       const context: any = { timestamp: new Date().toISOString(), chat_session_id: currentSessionId };
-      if (connectionId) {
+      const usingDatabase = activeSource === 'database' && !!connectionId;
+      const usingCsv = activeSource === 'csv' && !!csvDataset;
+
+      if (usingDatabase) {
         context.database_connection_id = connectionId;
         context.database_context = getTableContext();
         context.selected_tables = selectedTables;
@@ -127,12 +141,22 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
         if (lc.includes('select') || lc.includes('show') || lc.includes('analyze') || lc.includes('table') || lc.includes('data') || lc.includes('query')) context.likely_sql = true;
       }
 
+      if (usingCsv && csvDataset) {
+        context.data = csvDataset.data;
+        context.analysis_type = 'data_analysis';
+        context.dataset_name = csvDataset.name;
+        context.dataset_columns = csvDataset.columns;
+        context.dataset_row_count = csvDataset.rowCount;
+        context.dataset_sample_limit = csvSampleLimit;
+        context.database_context = getTableContext();
+      }
+
       const startTime = Date.now();
       const response = await apiClient.sendChatMessage(content, context, abortControllerRef.current.signal, selectedModel?.id);
       const executionTime = Date.now() - startTime;
 
       let enrichedAnalysis = response.analysis;
-      if (response.analysis?.sql_query && connectionId && !response.analysis?.data) {
+      if (response.analysis?.sql_query && usingDatabase && !response.analysis?.data) {
         try {
           const queryResult = await executeQuery(response.analysis.sql_query);
           enrichedAnalysis = { ...response.analysis, data: queryResult.data, columns: queryResult.columns, row_count: queryResult.row_count };
@@ -175,7 +199,7 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
       setIsLoading(false);
       abortControllerRef.current = null;
     }
-  }, [connectionId, getTableContext, executeQuery, selectedTables, databaseInfo, currentSessionId, saveSessionMessages, dispatch, tables, selectedModel]);
+  }, [connectionId, getTableContext, executeQuery, selectedTables, databaseInfo, currentSessionId, saveSessionMessages, dispatch, tables, selectedModel, activeSource, csvDataset, csvSampleLimit]);
 
   const stopGeneration = useCallback(() => {
     if (abortControllerRef.current) {

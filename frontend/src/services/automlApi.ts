@@ -14,7 +14,16 @@ import {
   MetricInfo,
   UploadResponse,
   AutoMLJobSummary,
+  PlaybookValidateRequest,
+  PlaybookValidateResponse,
+  PlaybookRunRequest,
+  PlaybookRunResponse,
+  PlaybookFromGDMRequest,
+  FullResultsRequest,
+  FullAutoMLResults,
+  PlaybookConfig,
 } from '../types/automl';
+import { Playbook } from '../types';
 
 const API_BASE_URL = (import.meta.env.VITE_API_URL as string) || '/api/v1';
 
@@ -176,6 +185,126 @@ export const automlApi = {
         limit,
       },
     });
+    return response.data;
+  },
+
+  // ============================================================================
+  // Playbook API Methods
+  // ============================================================================
+
+  /**
+   * List all available playbooks
+   */
+  async listPlaybooks(): Promise<Playbook[]> {
+    const response = await api.get('/playbooks');
+    return response.data;
+  },
+
+  /**
+   * Get a specific playbook by ID
+   */
+  async getPlaybook(playbookId: string): Promise<PlaybookConfig> {
+    const response = await api.get(`/playbooks/${playbookId}`);
+    return response.data;
+  },
+
+  /**
+   * Validate a playbook configuration before execution
+   */
+  async validatePlaybook(request: PlaybookValidateRequest): Promise<PlaybookValidateResponse> {
+    const response = await api.post('/playbooks/validate', request);
+    return response.data;
+  },
+
+  /**
+   * Run a playbook with optional validation
+   */
+  async runPlaybook(request: PlaybookRunRequest): Promise<PlaybookRunResponse> {
+    const response = await api.post('/playbooks/run', request);
+    return response.data;
+  },
+
+  /**
+   * Generate a playbook from GDM results
+   */
+  async generatePlaybookFromGDM(request: PlaybookFromGDMRequest): Promise<{
+    id: string;
+    name: string;
+    description?: string;
+    domain?: string;
+    required_inputs?: string[];
+    steps?: string[];
+    defaults?: Record<string, any>;
+  }> {
+    const response = await api.post('/playbooks/generate', request);
+    return response.data;
+  },
+
+  // ============================================================================
+  // Enhanced Results API Methods
+  // ============================================================================
+
+  /**
+   * Get full results with business metrics and GPT-5 interpretation
+   */
+  async getFullResults(jobId: string, request?: FullResultsRequest): Promise<FullAutoMLResults> {
+    const response = await api.post(`/automl/${jobId}/full-results`, request || {
+      include_predictions: true,
+      predictions_limit: 100,
+      compute_business_metrics: true,
+      generate_interpretation: true,
+    });
+    return response.data;
+  },
+
+  /**
+   * Generate or regenerate GPT-5 interpretation
+   */
+  async generateInterpretation(jobId: string, businessContext?: string): Promise<{
+    job_id: string;
+    interpretation: {
+      executive_summary: string;
+      key_findings: Array<{
+        finding: string;
+        evidence: string;
+        business_implication: string;
+      }>;
+      recommended_actions: Array<{
+        action: string;
+        priority: 'high' | 'medium' | 'low';
+        expected_impact: string;
+      }>;
+      model_assessment: {
+        strengths: string[];
+        limitations: string[];
+        confidence_level: 'high' | 'medium' | 'low';
+      };
+      next_steps: string[];
+      caveats: string[];
+    };
+  }> {
+    const response = await api.post(`/automl/${jobId}/interpret`, {
+      business_context: businessContext,
+    });
+    return response.data;
+  },
+
+  /**
+   * Get AutoML job from playbooks endpoint (for playbook-based jobs)
+   */
+  async getPlaybookJobStatus(jobId: string): Promise<{
+    job_id: string;
+    status: string;
+    progress_pct?: number;
+    current_step?: string;
+    models_trained?: number;
+    best_model?: string;
+    best_score?: number;
+    elapsed_seconds?: number;
+    error?: string;
+    results?: FullAutoMLResults;
+  }> {
+    const response = await api.get(`/automl/${jobId}`);
     return response.data;
   },
 };

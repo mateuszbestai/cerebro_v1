@@ -127,17 +127,42 @@ class AutoMLResultsResponse(BaseModel):
 
     # Feature analysis
     feature_importance: Dict[str, float]
+    features_used: Optional[List[str]] = None
 
     # Training info
     training_time_seconds: int
     num_rows_train: int
     num_features: int
     model_path: str
+    predictions_path: Optional[str] = None
 
     # Predictions
     predictions_sample: Optional[List[Dict[str, Any]]] = None
+    prediction_intervals: Optional[Dict[str, Any]] = None
     confusion_matrix: Optional[List[List[int]]] = None
     class_labels: Optional[List[str]] = None
+    threshold_analysis: Optional[Dict[str, Any]] = None
+    gains_summary: Optional[Dict[str, Any]] = None
+
+    # Forecasting
+    forecast_data: Optional[List[Dict[str, Any]]] = None
+
+    # Clustering
+    cluster_labels: Optional[List[int]] = None
+    cluster_centers: Optional[List[List[float]]] = None
+    cluster_sizes: Optional[Dict[int, int]] = None
+    n_clusters: Optional[int] = None
+
+    # Anomaly
+    anomaly_scores: Optional[List[float]] = None
+    anomaly_threshold: Optional[float] = None
+    n_anomalies: Optional[int] = None
+
+    # Playbook context
+    playbook_id: Optional[str] = None
+    playbook_hash: Optional[str] = None
+    playbook_version: Optional[str] = None
+    validation_summary: Optional[Dict[str, Any]] = None
 
     # LLM insights (added by insights service)
     insights: Optional[Dict[str, Any]] = None

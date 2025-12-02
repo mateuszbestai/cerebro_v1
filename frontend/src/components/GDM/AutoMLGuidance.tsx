@@ -200,11 +200,11 @@ const AutoMLGuidance: React.FC<Props> = ({ guidance, onApplyTarget }) => {
                     </Stack>
                   }
                   secondary={
-                    <Stack spacing={0.5} sx={{ mt: 0.5 }}>
-                      <Typography variant="caption" color="text.secondary" sx={{ wordBreak: 'break-word' }}>
+                    <Box sx={{ mt: 0.5 }}>
+                      <Typography variant="caption" color="text.secondary" sx={{ wordBreak: 'break-word', display: 'block', mb: 0.5 }}>
                         {rec.reason}
                       </Typography>
-                      <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap>
+                      <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', flexWrap: 'wrap' }}>
                         {rec.business_process && (
                           <Chip
                             size="small"
@@ -224,9 +224,10 @@ const AutoMLGuidance: React.FC<Props> = ({ guidance, onApplyTarget }) => {
                         {rec.row_count && (
                           <Chip size="small" label={`${rec.row_count.toLocaleString()} rows`} />
                         )}
-                      </Stack>
-                    </Stack>
+                      </Box>
+                    </Box>
                   }
+                  secondaryTypographyProps={{ component: 'div' }}
                 />
               </ListItem>
             ))}

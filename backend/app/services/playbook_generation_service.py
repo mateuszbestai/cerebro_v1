@@ -219,8 +219,13 @@ class PlaybookGenerationService:
         """
         draft: Dict[str, Any]
         try:
+            # Use GPT-5 model for playbook generation
+            from app.config import settings
+            gpt5_model_id = settings.AZURE_OPENAI_COMPLETION_MODEL_NAME
+            logger.info(f"Generating playbook using {gpt5_model_id} model")
+
             llm_response = await self._llm.generate_response(
-                prompt, response_format="json"
+                prompt, response_format="json", model_id=gpt5_model_id
             )
             if isinstance(llm_response, str):
                 draft = json.loads(llm_response)

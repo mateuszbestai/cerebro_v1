@@ -42,6 +42,9 @@ import ScienceIcon from '@mui/icons-material/Science';
 import InsightsIcon from '@mui/icons-material/Insights';
 import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import CategoryIcon from '@mui/icons-material/Category';
+import TimelineIcon from '@mui/icons-material/Timeline';
+import BubbleChartIcon from '@mui/icons-material/BubbleChart';
+import WarningAmberIcon from '@mui/icons-material/WarningAmber';
 
 import { useAssistant } from '../../contexts/AssistantContext';
 import { useDatabase } from '../../contexts/DatabaseContext';
@@ -49,11 +52,15 @@ import { automlApi } from '../../services/automlApi';
 import { gdmApi, AutomlTargetRecommendation } from '../../services/gdmApi';
 import {
   Preset,
-  TaskType,
+  ProblemType,
   AutoMLStartRequest,
   AutoMLStatusResponse,
   ColumnInfo,
 } from '../../types/automl';
+
+// Use ProblemType for the task state to support all 5 problem types
+type TaskType = ProblemType;
+import PlaybookRunner from '../Playbooks/PlaybookRunner';
 
 const PRESETS: { value: Preset; label: string; description: string; icon: React.ReactNode; time: string }[] = [
   { value: 'quick', label: 'Quick', description: 'Fast results for exploration', icon: <SpeedIcon />, time: '~5 min' },
@@ -61,7 +68,11 @@ const PRESETS: { value: Preset; label: string; description: string; icon: React.
   { value: 'thorough', label: 'Thorough', description: 'Best accuracy, slower training', icon: <ScienceIcon />, time: '~60 min' },
 ];
 
-const AutoMLStudioPanel: React.FC = () => {
+interface AutoMLStudioPanelProps {
+  onShowResults?: () => void;
+}
+
+const AutoMLStudioPanel: React.FC<AutoMLStudioPanelProps> = ({ onShowResults }) => {
   const theme = useTheme();
   const {
     gdmJobId,
@@ -69,7 +80,6 @@ const AutoMLStudioPanel: React.FC = () => {
     automlStatus,
     setAutomlJobId,
     setAutomlStatus,
-    navigateToForecasts,
   } = useAssistant();
   const { connectionId, tables, isConnected } = useDatabase();
 
@@ -285,6 +295,40 @@ const AutoMLStudioPanel: React.FC = () => {
           </Box>
         </Grid>
 
+        {/* Playbook Launcher */}
+        <Grid item xs={12}>
+          <Paper
+            variant="outlined"
+            sx={{
+              p: 2,
+              display: 'flex',
+              alignItems: { xs: 'flex-start', sm: 'center' },
+              justifyContent: 'space-between',
+              gap: 2,
+              flexWrap: 'wrap',
+            }}
+          >
+            <Box>
+              <Typography variant="subtitle1">Run a GDM Playbook</Typography>
+              <Typography variant="body2" color="text.secondary">
+                Launch AutoGluon training using the playbook generated from your Global Data Model.
+              </Typography>
+            </Box>
+            <PlaybookRunner
+              onJobLaunched={(jobId) => {
+                setAutomlJobId(jobId);
+                setAutomlStatus('training');
+              }}
+              gdmJobId={gdmJobId || undefined}
+              prefillTarget={{
+                table: selectedTable || recommendations[0]?.table || undefined,
+                column: targetColumn || recommendations[0]?.column || undefined,
+                task,
+              }}
+            />
+          </Paper>
+        </Grid>
+
         {/* GDM Recommendations */}
         {recommendations.length > 0 && automlStatus === 'idle' && (
           <Grid item xs={12}>
@@ -369,22 +413,55 @@ const AutoMLStudioPanel: React.FC = () => {
             {/* Task Type */}
             <Grid item xs={12} md={6}>
               <FormControl fullWidth>
-                <InputLabel>Task Type</InputLabel>
+                <InputLabel>Problem Type</InputLabel>
                 <Select
                   value={task}
-                  label="Task Type"
+                  label="Problem Type"
                   onChange={(e) => setTask(e.target.value as TaskType)}
                 >
                   <MenuItem value="classification">
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                      <CategoryIcon fontSize="small" />
-                      Classification (Predict categories)
+                      <CategoryIcon fontSize="small" color="primary" />
+                      <Box>
+                        <Typography variant="body2">Classification</Typography>
+                        <Typography variant="caption" color="text.secondary">Predict categories (yes/no, churn/retain)</Typography>
+                      </Box>
                     </Box>
                   </MenuItem>
                   <MenuItem value="regression">
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                      <TrendingUpIcon fontSize="small" />
-                      Regression (Predict numbers)
+                      <TrendingUpIcon fontSize="small" color="success" />
+                      <Box>
+                        <Typography variant="body2">Regression</Typography>
+                        <Typography variant="caption" color="text.secondary">Predict numeric values (revenue, price)</Typography>
+                      </Box>
+                    </Box>
+                  </MenuItem>
+                  <MenuItem value="forecasting">
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <TimelineIcon fontSize="small" color="info" />
+                      <Box>
+                        <Typography variant="body2">Forecasting</Typography>
+                        <Typography variant="caption" color="text.secondary">Predict future time series values</Typography>
+                      </Box>
+                    </Box>
+                  </MenuItem>
+                  <MenuItem value="clustering">
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <BubbleChartIcon fontSize="small" color="secondary" />
+                      <Box>
+                        <Typography variant="body2">Clustering</Typography>
+                        <Typography variant="caption" color="text.secondary">Group similar records together</Typography>
+                      </Box>
+                    </Box>
+                  </MenuItem>
+                  <MenuItem value="anomaly">
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <WarningAmberIcon fontSize="small" color="warning" />
+                      <Box>
+                        <Typography variant="body2">Anomaly Detection</Typography>
+                        <Typography variant="caption" color="text.secondary">Find unusual or suspicious records</Typography>
+                      </Box>
                     </Box>
                   </MenuItem>
                 </Select>
@@ -549,7 +626,7 @@ const AutoMLStudioPanel: React.FC = () => {
                   <Button
                     variant="contained"
                     startIcon={<InsightsIcon />}
-                    onClick={() => navigateToForecasts(automlJobId || undefined)}
+                    onClick={() => onShowResults?.()}
                     sx={{ flex: 1 }}
                   >
                     View AI Insights & Forecasts

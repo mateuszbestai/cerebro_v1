@@ -31,6 +31,7 @@ import {
   History as HistoryIcon,
   Stop as StopIcon,
   ClearAll as ClearAllIcon,
+  UploadFile as UploadIcon,
 } from '@mui/icons-material';
 import { useChat } from '../../contexts/ChatContext';
 import { useDatabase } from '../../contexts/DatabaseContext';
@@ -45,7 +46,6 @@ import { useSelector } from 'react-redux';
 import { RootState } from '../../store';
 import ModelSelector from '../Chat/ModelSelector';
 import { alpha, useTheme } from '@mui/material/styles';
-import PlaybookRunner from '../Playbooks/PlaybookRunner';
 
 const ChatWorkspacePanel: React.FC = () => {
   const { messages, isLoading, sendMessage, currentAnalysis, clearMessages, stopGeneration } = useChat();
@@ -54,7 +54,10 @@ const ChatWorkspacePanel: React.FC = () => {
     databaseInfo,
     selectedTables,
     tables,
-    getTableContext
+    getTableContext,
+    activeSource,
+    csvDataset,
+    clearCsvDataset,
   } = useDatabase();
   const theme = useTheme();
 
@@ -64,6 +67,9 @@ const ChatWorkspacePanel: React.FC = () => {
   const [historyOpen, setHistoryOpen] = useState(false);
   const history = useSelector((state: RootState) => state.analysis.history);
   const hasAnalysisPanel = Boolean(showAnalysisPanel && currentAnalysis);
+  const hasDatabaseSource = activeSource === 'database' && isConnected;
+  const hasCsvSource = activeSource === 'csv' && !!csvDataset;
+  const hasDataSource = hasDatabaseSource || hasCsvSource;
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -86,6 +92,10 @@ const ChatWorkspacePanel: React.FC = () => {
   };
 
   const formatTableInfo = () => {
+    if (hasCsvSource && csvDataset) {
+      return `${csvDataset.columns.length} columns, ~${csvDataset.rowCount} rows`;
+    }
+
     if (!isConnected || !tables) return '';
 
     if (selectedTables.length > 0) {
@@ -94,10 +104,42 @@ const ChatWorkspacePanel: React.FC = () => {
     return `${tables.length} tables available`;
   };
 
+  const quickStartChips =
+    hasCsvSource && csvDataset
+      ? [
+          {
+            label: 'Summarize dataset',
+            prompt: `Summarize the uploaded dataset ${csvDataset.name} and highlight key columns.`,
+          },
+          {
+            label: 'Data quality scan',
+            prompt: 'Check this CSV for missing values, outliers, and dtype issues.',
+          },
+          {
+            label: 'Top correlations',
+            prompt: 'Find the strongest correlations and interesting relationships in the uploaded data.',
+          },
+          {
+            label: 'Suggested visuals',
+            prompt: 'Create charts that best explain trends and distributions in this dataset.',
+          },
+        ]
+      : [
+          { label: 'Show me all tables', prompt: 'Show me all tables in the database' },
+          { label: 'Analyze data structure', prompt: 'Analyze the structure of the database' },
+          { label: 'Generate summary report', prompt: 'Generate a summary report of the database' },
+        ];
+
+  const sourceSubtitle = hasDatabaseSource
+    ? `Connected to ${databaseInfo?.database_name}`
+    : hasCsvSource && csvDataset
+      ? `Using uploaded CSV: ${csvDataset.name}`
+      : 'Ask questions about your data';
+
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
-      {/* Database Context Bar */}
-      {isConnected && (
+      {/* Data Source Context Bar */}
+      {hasDataSource && (
         <Paper
           elevation={0}
           sx={{
@@ -111,30 +153,54 @@ const ChatWorkspacePanel: React.FC = () => {
         >
           <Box display="flex" alignItems="center" justifyContent="space-between">
             <Box display="flex" alignItems="center" gap={2}>
-              <Chip
-                icon={<DatabaseIcon />}
-                label={databaseInfo?.database_name || 'Connected'}
-                color="success"
-                variant="outlined"
-              />
+              {hasDatabaseSource && (
+                <Chip
+                  icon={<DatabaseIcon />}
+                  label={databaseInfo?.database_name || 'Connected'}
+                  color="success"
+                  variant="outlined"
+                />
+              )}
+
+              {hasCsvSource && csvDataset && (
+                <Chip
+                  icon={<UploadIcon />}
+                  label={csvDataset.name}
+                  color="secondary"
+                  variant="outlined"
+                />
+              )}
 
               <Chip
                 icon={<TableIcon />}
                 label={formatTableInfo()}
                 variant="outlined"
-                color={selectedTables.length > 0 ? 'primary' : 'default'}
+                color={selectedTables.length > 0 || hasCsvSource ? 'primary' : 'default'}
               />
 
-              {selectedTables.length === 0 && tables.length > 0 && (
+              {hasDatabaseSource && selectedTables.length === 0 && tables.length > 0 && (
                 <Alert severity="info" sx={{ py: 0, px: 1 }}>
                   <Typography variant="caption">
                     Tip: Select tables in Schema Explorer for focused analysis
                   </Typography>
                 </Alert>
               )}
+
+              {hasCsvSource && csvDataset && (
+                <Alert severity="info" sx={{ py: 0, px: 1 }}>
+                  <Typography variant="caption">
+                    Using first {csvDataset.data.length} rows (~{csvDataset.rowCount} total) for analysis
+                  </Typography>
+                </Alert>
+              )}
             </Box>
 
             <Box display="flex" alignItems="center" gap={1}>
+              {hasCsvSource && (
+                <Button size="small" color="secondary" onClick={clearCsvDataset}>
+                  Remove CSV
+                </Button>
+              )}
               <Button
                 size="small"
                 startIcon={showDatabaseContext ? <ExpandLessIcon /> : <ExpandMoreIcon />}
@@ -157,7 +223,7 @@ const ChatWorkspacePanel: React.FC = () => {
               }}
             >
               <Typography variant="subtitle2" gutterBottom>
-                Database Context for AI:
+                Data context for AI:
               </Typography>
               <Typography
                 variant="body2"
@@ -176,23 +242,15 @@ const ChatWorkspacePanel: React.FC = () => {
         </Paper>
       )}
 
-      {/* No Database Warning */}
-      {!isConnected && (
+      {/* No Data Source Warning */}
+      {!hasDataSource && (
         <Alert
           severity="warning"
           sx={{ mb: 2, flexShrink: 0 }}
           icon={<WarningIcon />}
-          action={
-            <Button
-              color="inherit"
-              size="small"
-              onClick={() => window.location.href = '/database'}
-            >
-              Connect Database
-            </Button>
-          }
         >
-          No database connected. SQL queries and data analysis features are limited. Connect a database for full functionality.
+          No data source selected. Use the source picker above to connect a database or upload a CSV
+          table for analysis.
         </Alert>
       )}
 
@@ -225,16 +283,12 @@ const ChatWorkspacePanel: React.FC = () => {
               <Box>
                 <Typography variant="h6">AI Analysis Assistant</Typography>
                 <Typography variant="caption" color="text.secondary">
-                  {isConnected
-                    ? `Connected to ${databaseInfo?.database_name}`
-                    : 'Ask questions about your data'
-                  }
+                  {sourceSubtitle}
                 </Typography>
               </Box>
 
               <Box display="flex" alignItems="center" gap={1}>
                 <ModelSelector />
-                <PlaybookRunner compact />
                 {/* Chat sessions controls */}
                 <ChatSessionsControls />
 
@@ -303,7 +357,7 @@ const ChatWorkspacePanel: React.FC = () => {
           <MessageInput
             onSendMessage={handleSendMessage}
             disabled={isLoading}
-            showDatabaseHint={isConnected}
+            showDatabaseHint={hasDataSource}
             selectedTables={selectedTables}
           />
         </Paper>
@@ -424,41 +478,34 @@ const ChatWorkspacePanel: React.FC = () => {
       </Box>
 
       {/* Quick Tips */}
-      {isConnected && messages.length === 0 && (
+      {hasDataSource && messages.length === 0 && (
         <Box sx={{ mt: 3, flexShrink: 0 }}>
           <Typography variant="h6" gutterBottom>
             Quick Start Suggestions:
           </Typography>
           <Box display="flex" gap={1} flexWrap="wrap">
-            <Chip
-              label="Show me all tables"
-              onClick={() => handleSendMessage("Show me all tables in the database")}
-              sx={{ cursor: 'pointer' }}
-            />
-            <Chip
-              label="Analyze data structure"
-              onClick={() => handleSendMessage("Analyze the structure of the database")}
-              sx={{ cursor: 'pointer' }}
-            />
-            {selectedTables.length > 0 && (
-              <>
-                <Chip
-                  label={`Analyze ${selectedTables[0]}`}
-                  onClick={() => handleSendMessage(`Analyze the ${selectedTables[0]} table and show me key insights`)}
-                  sx={{ cursor: 'pointer' }}
-                />
-                <Chip
-                  label={`Sample data from ${selectedTables[0]}`}
-                  onClick={() => handleSendMessage(`Show me sample data from ${selectedTables[0]}`)}
-                  sx={{ cursor: 'pointer' }}
-                />
-              </>
-            )}
-            <Chip
-              label="Generate summary report"
-              onClick={() => handleSendMessage("Generate a summary report of the database")}
-              sx={{ cursor: 'pointer' }}
-            />
+            {[
+              ...quickStartChips,
+              ...(hasDatabaseSource && selectedTables.length > 0
+                ? [
+                    {
+                      label: `Analyze ${selectedTables[0]}`,
+                      prompt: `Analyze the ${selectedTables[0]} table and show me key insights`,
+                    },
+                    {
+                      label: `Sample data from ${selectedTables[0]}`,
+                      prompt: `Show me sample data from ${selectedTables[0]}`,
+                    },
+                  ]
+                : []),
+            ].map((chip) => (
+              <Chip
+                key={chip.label}
+                label={chip.label}
+                onClick={() => handleSendMessage(chip.prompt)}
+                sx={{ cursor: 'pointer' }}
+              />
+            ))}
           </Box>
         </Box>
       )}

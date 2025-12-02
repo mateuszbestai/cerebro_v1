@@ -1,73 +1,83 @@
 /**
- * ChatInterface - Tabbed Database Assistant
+ * ChatInterface - Database Assistant Workspace
  *
- * Main container for the unified Database Assistant experience.
- * Provides three tabs:
- * - Chat Workspace (AI chat + analysis)
- * - AutoML Studio (streamlined ML training)
- * - AI Forecasts & Insights (results dashboard)
+ * Hosts the chat and analysis experience. AutoML Studio and AI Forecasts now live
+ * in the Assistant Suite navigation under Schema Explorer.
  */
 
-import React from 'react';
-import { Box, Container, Paper } from '@mui/material';
-import { AssistantProvider, useAssistant } from '../../contexts/AssistantContext';
-import AssistantTabs, { TabPanel } from '../Assistant/AssistantTabs';
+import React, { useEffect, useState } from 'react';
+import { Box, Container, Paper, Alert, Button, Collapse, Stack } from '@mui/material';
+import { AssistantProvider } from '../../contexts/AssistantContext';
 import ChatWorkspacePanel from '../Assistant/ChatWorkspacePanel';
-import AutoMLStudioPanel from '../Assistant/AutoMLStudioPanel';
-import AIForecastsPanel from '../Assistant/AIForecastsPanel';
+import { useNavigate } from 'react-router-dom';
+import DataSourceSelector from '../Assistant/DataSourceSelector';
+import { SwapHoriz as SwitchIcon } from '@mui/icons-material';
+import { useDatabase } from '../../contexts/DatabaseContext';
 
-const AssistantContent: React.FC = () => {
-  const { activeTab } = useAssistant();
+interface ChatInterfaceProps {
+  onOpenConnectionDialog?: () => void;
+}
+
+const AssistantContent: React.FC<ChatInterfaceProps> = ({ onOpenConnectionDialog }) => {
+  const navigate = useNavigate();
+  const { activeSource, isConnected, csvDataset } = useDatabase();
+  const [showSourceSelector, setShowSourceSelector] = useState(false);
+
+  const hasActiveSource =
+    (activeSource === 'database' && isConnected) || (activeSource === 'csv' && !!csvDataset);
+
+  useEffect(() => {
+    if (!hasActiveSource) {
+      setShowSourceSelector(true);
+    }
+  }, [hasActiveSource]);
 
   return (
-    <Box
+    <Paper
+      elevation={1}
       sx={{
         display: 'flex',
         flexDirection: 'column',
-        height: 'calc(100vh - 100px)',
-        minHeight: 600,
+        gap: 2,
+        p: { xs: 1, sm: 2 },
+        height: 'calc(100vh - 120px)',
+        minHeight: 640,
       }}
     >
-      {/* Tab Navigation */}
-      <Paper
-        elevation={1}
-        sx={{
-          borderRadius: '16px 16px 0 0',
-          overflow: 'hidden',
-        }}
+      <Stack direction="row" justifyContent="flex-end">
+        <Button
+          size="small"
+          variant="text"
+          startIcon={<SwitchIcon />}
+          onClick={() => setShowSourceSelector((prev) => !prev)}
+        >
+          {showSourceSelector ? 'Hide source picker' : 'Change data source'}
+        </Button>
+      </Stack>
+
+      <Collapse in={showSourceSelector || !hasActiveSource}>
+        <DataSourceSelector onConnectClick={onOpenConnectionDialog || (() => {})} />
+      </Collapse>
+
+      <Alert
+        severity="info"
+        variant="outlined"
+        action={
+          <Button color="primary" size="small" onClick={() => navigate('/solutions/automl')}>
+            Open AutoML & AI Forecasts
+          </Button>
+        }
       >
-        <AssistantTabs />
-      </Paper>
-
-      {/* Tab Content */}
-      <Paper
-        elevation={1}
-        sx={{
-          flex: 1,
-          borderRadius: '0 0 16px 16px',
-          display: 'flex',
-          flexDirection: 'column',
-          overflow: 'hidden',
-          mt: '-1px', // Overlap with tabs border
-        }}
-      >
-        <TabPanel value="chat" activeTab={activeTab}>
-          <ChatWorkspacePanel />
-        </TabPanel>
-
-        <TabPanel value="automl" activeTab={activeTab}>
-          <AutoMLStudioPanel />
-        </TabPanel>
-
-        <TabPanel value="forecasts" activeTab={activeTab}>
-          <AIForecastsPanel />
-        </TabPanel>
-      </Paper>
-    </Box>
+        AutoML Studio and AI Forecasts now live in the Assistant Suite panel under Schema Explorer.
+      </Alert>
+      <Box sx={{ flex: 1, minHeight: 0 }}>
+        <ChatWorkspacePanel />
+      </Box>
+    </Paper>
   );
 };
 
-const ChatInterface: React.FC = () => {
+const ChatInterface: React.FC<ChatInterfaceProps> = ({ onOpenConnectionDialog }) => {
   return (
     <Container
       maxWidth={false}
@@ -77,7 +87,7 @@ const ChatInterface: React.FC = () => {
       }}
     >
       <AssistantProvider>
-        <AssistantContent />
+        <AssistantContent onOpenConnectionDialog={onOpenConnectionDialog} />
       </AssistantProvider>
     </Container>
   );

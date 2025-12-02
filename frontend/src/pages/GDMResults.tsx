@@ -5,6 +5,7 @@ import {
   Card,
   CardContent,
   CircularProgress,
+  Button,
   Grid,
   Skeleton,
   Snackbar,
@@ -12,7 +13,7 @@ import {
   Typography,
 } from '@mui/material';
 import React, { useEffect, useMemo, useState } from 'react';
-import { useParams, useSearchParams } from 'react-router-dom';
+import { useParams, useSearchParams, Link as RouterLink } from 'react-router-dom';
 import ArtifactTabs from '../components/GDM/ArtifactTabs';
 import GraphPanel from '../components/GDM/GraphPanel';
 import InsightCards from '../components/GDM/InsightCards';
@@ -27,8 +28,9 @@ import {
   GDMTimelineItem,
   AutomlTargetRecommendation,
 } from '../services/gdmApi';
-import { saveLastGdmJob } from '../utils/gdmStorage';
+import { saveLastGdmJob, loadLastGdmJob } from '../utils/gdmStorage';
 import PlaybookFromGDM from '../components/Playbooks/PlaybookFromGDM';
+import PlaybookExecutor from '../components/Playbooks/PlaybookExecutor';
 import AutoMLGuidance from '../components/GDM/AutoMLGuidance';
 
 const DEFAULT_ARTIFACT = 'global_model.json';
@@ -74,7 +76,9 @@ const MetricsGrid: React.FC<{ results?: GDMResultsResponse; loading: boolean }> 
 const GDMResults: React.FC = () => {
   const { jobId: routeJobId } = useParams<{ jobId: string }>();
   const [searchParams] = useSearchParams();
-  const jobId = routeJobId || searchParams.get('jobId') || '';
+  const [jobId, setJobId] = useState<string>(() => {
+    return routeJobId || searchParams.get('jobId') || loadLastGdmJob()?.jobId || '';
+  });
   const queryClient = useQueryClient();
 
   const [highlightedNodes, setHighlightedNodes] = useState<string[]>([]);
@@ -82,6 +86,14 @@ const GDMResults: React.FC = () => {
   const [focusedEntity, setFocusedEntity] = useState<string | null>(null);
   const [toast, setToast] = useState<{ message: string; severity: 'success' | 'error' } | null>(null);
   const [prefillTarget, setPrefillTarget] = useState<{ table?: string; column?: string; task?: string } | null>(null);
+  const [generatedPlaybook, setGeneratedPlaybook] = useState<{ id: string; name: string; description?: string; defaults?: any } | null>(null);
+  const [automlJobId, setAutomlJobId] = useState<string | null>(null);
+
+  useEffect(() => {
+    const last = loadLastGdmJob();
+    const next = routeJobId || searchParams.get('jobId') || last?.jobId || '';
+    setJobId(next || '');
+  }, [routeJobId, searchParams]);
 
   const resultsQuery = useQuery({
     queryKey: ['gdmResults', jobId],
@@ -159,7 +171,19 @@ const GDMResults: React.FC = () => {
   };
 
   if (!jobId) {
-    return <Alert severity="warning">Provide a job id via the route or ?jobId= query string.</Alert>;
+    return (
+      <Alert
+        severity="info"
+        action={
+          <Button component={RouterLink} to="/database" variant="contained" size="small">
+            Open Schema Explorer
+          </Button>
+        }
+      >
+        No Global Data Model selected. Use Schema Explorer to build a model, then reopen GDM Results from the
+        Assistant Suite.
+      </Alert>
+    );
   }
 
   const results = resultsQuery.data;
@@ -179,8 +203,14 @@ const GDMResults: React.FC = () => {
     return undefined;
   }, [prefillTarget, topRecommendation?.table, topRecommendation?.column, topRecommendation?.task]);
 
-  const handlePlaybookGenerated = (pb: { name: string }) => {
+  const handlePlaybookGenerated = (pb: { id: string; name: string; description?: string; defaults?: any }) => {
+    setGeneratedPlaybook(pb);
     setToast({ message: `Playbook "${pb.name}" created from this GDM.`, severity: 'success' });
+  };
+
+  const handleJobLaunched = (launchedJobId: string) => {
+    setAutomlJobId(launchedJobId);
+    setToast({ message: 'AutoML training started successfully!', severity: 'success' });
   };
 
   useEffect(() => {
@@ -237,6 +267,16 @@ const GDMResults: React.FC = () => {
               results={results}
               onGenerated={handlePlaybookGenerated}
               prefillTarget={activePrefill}
+            />
+          </Box>
+        )}
+
+        {generatedPlaybook && (
+          <Box sx={{ mt: 3 }}>
+            <PlaybookExecutor
+              playbook={generatedPlaybook}
+              gdmJobId={jobId}
+              onJobLaunched={handleJobLaunched}
             />
           </Box>
         )}

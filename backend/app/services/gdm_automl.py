@@ -183,6 +183,7 @@ def _target_recommendation(
         "business_process": entity.get("business_process"),
         "feature_time": feature_time,
         "row_count": row_count or None,
+        "quality": column.get("quality"),
         "_score": score,
     }
 
@@ -314,8 +315,17 @@ def _compute_target_warnings(
     # Check cardinality for classification
     cardinality = quality.get("cardinality")
     if task == "classification" and cardinality:
-        if cardinality > 50:
-            warnings.append(f"High cardinality ({cardinality} classes) - consider grouping rare classes")
+        if cardinality > 100:
+            warnings.append(
+                f"Very high cardinality ({cardinality} classes) - exceeds maximum. "
+                "Consider: (1) regression if numeric, (2) grouping classes, or (3) different target"
+            )
+            severity = "high"
+        elif cardinality > 50:
+            warnings.append(
+                f"High cardinality ({cardinality} classes) - may require long training time. "
+                "Consider grouping rare classes or using binning"
+            )
             severity = "medium" if severity != "high" else severity
         elif cardinality < 2:
             warnings.append("Only 1 class detected - cannot train classifier")
@@ -446,6 +456,8 @@ def prepare_automl_metadata(
                 if warning:
                     target_warnings.append(warning)
                     candidate["has_warnings"] = True
+                    candidate["warnings"] = warning["warnings"]
+                    candidate["warning_severity"] = warning["severity"]
 
                 entity_targets.append(candidate)
                 recommended_targets.append(candidate)
@@ -461,6 +473,26 @@ def prepare_automl_metadata(
             feature_suggestions.append(features)
 
     recommended_targets.sort(key=lambda item: item["_score"], reverse=True)
+
+    # Filter out high-risk targets based on quality and warnings
+    def _is_eligible(rec: Dict[str, Any]) -> bool:
+        warning_severity = rec.get("warning_severity")
+        if warning_severity == "high":
+            return False
+        quality = rec.get("quality") or {}
+        null_pct = quality.get("null_pct")
+        if null_pct is not None and null_pct > 0.5:
+            return False
+        if rec.get("task") == "classification":
+            cardinality = quality.get("cardinality")
+            # More lenient filtering - allow up to 100 classes but prefer lower cardinality
+            if cardinality and cardinality > 100:
+                return False
+        return True
+
+    eligible_targets = [rec for rec in recommended_targets if _is_eligible(rec)]
+    fallback_targets = recommended_targets if eligible_targets else recommended_targets[:5]
+
     for rec in recommended_targets:
         rec.pop("_score", None)
     for entity in entities:
@@ -471,7 +503,7 @@ def prepare_automl_metadata(
     data_readiness = _compute_data_readiness(entities, recommended_targets)
 
     guidance = {
-        "recommended_targets": recommended_targets[:10],
+        "recommended_targets": eligible_targets[:10] if eligible_targets else fallback_targets,
         "feature_availability": feature_availability,
         "business_processes": business_processes,
         "kpi_columns": kpi_columns,
@@ -479,5 +511,6 @@ def prepare_automl_metadata(
         "semantic_columns": semantic_columns,
         "target_warnings": target_warnings,
         "data_readiness": data_readiness,
+        "recommendation_message": None if eligible_targets else "No high-quality targets detected; review data quality or select a different table/column.",
     }
     return entities, guidance

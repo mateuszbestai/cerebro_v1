@@ -1,5 +1,15 @@
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
+import Papa from 'papaparse';
 import { databaseApi, ConnectionRequest, TableInfo, DatabaseInfo } from '../services/databaseApi';
+
+export type DataSourceType = 'database' | 'csv';
+
+export interface CsvDataset {
+  name: string;
+  columns: string[];
+  rowCount: number;
+  data: any[];
+}
 
 interface DatabaseContextType {
   // State
@@ -10,6 +20,11 @@ interface DatabaseContextType {
   databaseInfo: DatabaseInfo | null;
   tables: TableInfo[];
   selectedTables: string[];
+  activeSource: DataSourceType | null;
+  csvDataset: CsvDataset | null;
+  csvError: string | null;
+  isCsvLoading: boolean;
+  csvSampleLimit: number;
   
   // Actions
   connect: (params: ConnectionRequest) => Promise<void>;
@@ -19,6 +34,9 @@ interface DatabaseContextType {
   executeQuery: (query: string) => Promise<any>;
   getTableContext: () => string;
   clearError: () => void;
+  setActiveSource: (source: DataSourceType | null) => void;
+  loadCsvDataset: (file: File, rowLimit?: number) => Promise<void>;
+  clearCsvDataset: () => void;
 }
 
 const DatabaseContext = createContext<DatabaseContextType | undefined>(undefined);
@@ -43,6 +61,12 @@ export const DatabaseProvider: React.FC<DatabaseProviderProps> = ({ children }) 
   const [databaseInfo, setDatabaseInfo] = useState<DatabaseInfo | null>(null);
   const [tables, setTables] = useState<TableInfo[]>([]);
   const [selectedTables, setSelectedTables] = useState<string[]>([]);
+  const [activeSource, setActiveSourceState] = useState<DataSourceType | null>(null);
+  const [csvDataset, setCsvDataset] = useState<CsvDataset | null>(null);
+  const [csvError, setCsvError] = useState<string | null>(null);
+  const [isCsvLoading, setIsCsvLoading] = useState(false);
+
+  const CSV_ROW_LIMIT = 750;
 
   // Load saved connection from localStorage on mount
   useEffect(() => {
@@ -81,6 +105,7 @@ export const DatabaseProvider: React.FC<DatabaseProviderProps> = ({ children }) 
       setIsConnected(true);
       setDatabaseInfo(info);
       setTables(tablesResponse.tables);
+      setActiveSourceState('database');
     } catch (error) {
       // Connection is no longer valid
       localStorage.removeItem('database_connection_id');
@@ -97,7 +122,79 @@ export const DatabaseProvider: React.FC<DatabaseProviderProps> = ({ children }) 
     setDatabaseInfo(null);
     setTables([]);
     setSelectedTables([]);
+    setActiveSourceState(csvDataset ? 'csv' : null);
   };
+
+  const parseCsvFile = useCallback((file: File, rowLimit: number): Promise<CsvDataset> => {
+    return new Promise((resolve, reject) => {
+      const rows: any[] = [];
+      let totalRows = 0;
+      let columns: string[] = [];
+
+      Papa.parse(file, {
+        header: true,
+        dynamicTyping: true,
+        skipEmptyLines: true,
+        worker: true,
+        chunkSize: 1024 * 1024,
+        chunk: (results) => {
+          const dataChunk = (results.data as any[]) || [];
+          const fields = (results.meta?.fields as string[] | undefined) || [];
+          if (columns.length === 0 && fields.length > 0) {
+            columns = fields.filter(Boolean);
+          }
+
+          totalRows += dataChunk.length;
+          const remaining = rowLimit - rows.length;
+          if (remaining > 0) {
+            rows.push(...dataChunk.slice(0, remaining));
+          }
+        },
+        complete: () => {
+          if (columns.length === 0 && rows.length > 0) {
+            columns = Object.keys(rows[0]);
+          }
+          resolve({
+            name: file.name,
+            columns,
+            rowCount: totalRows || rows.length,
+            data: rows.slice(0, rowLimit),
+          });
+        },
+        error: (err) => reject(err),
+      });
+    });
+  }, []);
+
+  const setActiveSource = useCallback((source: DataSourceType | null) => {
+    if (source === 'database' && !isConnected) return;
+    if (source === 'csv' && !csvDataset) return;
+    setActiveSourceState(source);
+  }, [csvDataset, isConnected]);
+
+  const loadCsvDataset = useCallback(async (file: File, rowLimit: number = CSV_ROW_LIMIT) => {
+    setIsCsvLoading(true);
+    setCsvError(null);
+    try {
+      const parsed = await parseCsvFile(file, rowLimit);
+      setCsvDataset(parsed);
+      setActiveSourceState('csv');
+    } catch (err: any) {
+      const message = err?.message || 'Failed to load CSV file';
+      setCsvError(message);
+      throw err;
+    } finally {
+      setIsCsvLoading(false);
+    }
+  }, [parseCsvFile]);
+
+  const clearCsvDataset = useCallback(() => {
+    setCsvDataset(null);
+    setCsvError(null);
+    if (activeSource === 'csv') {
+      setActiveSourceState(isConnected ? 'database' : null);
+    }
+  }, [activeSource, isConnected]);
 
   const connect = useCallback(async (params: ConnectionRequest) => {
     setIsConnecting(true);
@@ -122,6 +219,7 @@ export const DatabaseProvider: React.FC<DatabaseProviderProps> = ({ children }) 
         setTables(tablesResponse.tables);
         setSelectedTables([]);
         setError(null);
+        setActiveSourceState('database');
       } else {
         throw new Error(response.message);
       }
@@ -170,6 +268,16 @@ export const DatabaseProvider: React.FC<DatabaseProviderProps> = ({ children }) 
   }, [connectionId]);
 
   const getTableContext = useCallback((): string => {
+    if (activeSource === 'csv' && csvDataset) {
+      const columnList = csvDataset.columns.slice(0, 25).join(', ');
+      const truncated = csvDataset.columns.length > 25 ? ' ...' : '';
+      return [
+        `Uploaded dataset: ${csvDataset.name}`,
+        `Rows available: ~${csvDataset.rowCount} (using first ${csvDataset.data.length} rows for analysis)`,
+        `Columns (${csvDataset.columns.length}): ${columnList}${truncated}`,
+      ].join('\n');
+    }
+
     if (!isConnected || !databaseInfo) {
       return '';
     }
@@ -202,7 +310,7 @@ export const DatabaseProvider: React.FC<DatabaseProviderProps> = ({ children }) 
     }
 
     return context;
-  }, [isConnected, databaseInfo, tables, selectedTables]);
+  }, [activeSource, csvDataset, isConnected, databaseInfo, tables, selectedTables]);
 
   const clearError = useCallback(() => {
     setError(null);
@@ -216,6 +324,11 @@ export const DatabaseProvider: React.FC<DatabaseProviderProps> = ({ children }) 
     databaseInfo,
     tables,
     selectedTables,
+    activeSource,
+    csvDataset,
+    csvError,
+    isCsvLoading,
+    csvSampleLimit: CSV_ROW_LIMIT,
     connect,
     disconnect,
     setSelectedTables,
@@ -223,6 +336,9 @@ export const DatabaseProvider: React.FC<DatabaseProviderProps> = ({ children }) 
     executeQuery,
     getTableContext,
     clearError,
+    setActiveSource,
+    loadCsvDataset,
+    clearCsvDataset,
   };
 
   return (
