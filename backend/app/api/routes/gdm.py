@@ -21,8 +21,17 @@ class GDMArtifact(APIModel):
     relative_path: Optional[str] = None
 
 
+class UploadedDataset(APIModel):
+    name: str = Field(..., description="Name of the uploaded CSV dataset")
+    columns: Optional[List[str]] = Field(default=None, description="Column names if known")
+    rows: List[Dict[str, Any]] = Field(default_factory=list, description="Sampled rows")
+    row_count: Optional[int] = Field(default=None, description="Approximate total rows in source file")
+
+
 class GDMCreateRequest(APIModel):
-    database_id: str = Field(..., description="Active database connection identifier")
+    database_id: Optional[str] = Field(
+        default=None, description="Active database connection identifier (optional when using dataset)"
+    )
     connection: Optional[Dict[str, Any]] = Field(
         default=None,
         description="Optional connection payload if the database is not already connected",
@@ -30,6 +39,10 @@ class GDMCreateRequest(APIModel):
     model: Optional[str] = Field(
         default=None,
         description="Preferred model id (gpt-5 or gpt-4.1). Defaults follow service heuristics.",
+    )
+    dataset: Optional[UploadedDataset] = Field(
+        default=None,
+        description="Uploaded CSV dataset to build a Global Data Model without a live database",
     )
 
 
@@ -255,6 +268,7 @@ async def create_gdm(request: GDMCreateRequest):
             database_id=request.database_id,
             user_model=request.model,
             connection_payload=request.connection,
+            dataset=request.dataset.model_dump() if request.dataset else None,
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc

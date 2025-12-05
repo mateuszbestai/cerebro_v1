@@ -19,6 +19,7 @@ import {
 } from '@mui/icons-material';
 import { alpha } from '@mui/material/styles';
 import { useDatabase } from '../../contexts/DatabaseContext';
+import CreateGDMButton from '../Database/CreateGDMButton';
 
 interface DataSourceSelectorProps {
   onConnectClick: () => void;
@@ -208,6 +209,12 @@ const DataSourceSelector: React.FC<DataSourceSelectorProps> = ({ onConnectClick 
                   <Typography variant="caption" color="text.secondary">
                     Using the first {csvDataset.data.length} rows (up to {csvSampleLimit}) for fast analysis.
                   </Typography>
+                </Box>
+              )}
+
+              {csvDataset && (
+                <Box sx={{ mt: 1 }}>
+                  <CreateGDMButton dbId={null} csvDataset={csvDataset} />
                 </Box>
               )}
 

@@ -2,10 +2,18 @@ import axios from 'axios';
 
 const API_BASE_URL = (import.meta.env.VITE_API_URL as string) || '/api/v1';
 
+export interface GdmDatasetPayload {
+  name: string;
+  columns?: string[];
+  rows: any[];
+  row_count?: number;
+}
+
 export interface GDMCreatePayload {
-  database_id: string;
+  database_id?: string;
   model?: 'gpt-5' | 'gpt-4.1';
   connection?: Record<string, any>;
+  dataset?: GdmDatasetPayload;
 }
 
 export interface GDMCreateResponse {

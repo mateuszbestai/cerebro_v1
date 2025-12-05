@@ -46,6 +46,8 @@ class GDMJob:
     connection_payload: Optional[Dict[str, Any]] = None
     engine: Any = None
     owns_engine: bool = False
+    source_type: str = "database"  # database | csv
+    dataset: Optional[Dict[str, Any]] = None
 
     def append_log(self, step: str, message: str):
         self.logs.append(
@@ -96,8 +98,16 @@ class GDMService:
             )
             return fallback
 
+    def _slugify_dataset(self, dataset: Dict[str, Any]) -> str:
+        name = dataset.get("name") or "csv-upload"
+        base = name.replace(".", "_").replace(" ", "_")
+        safe = "".join(ch for ch in base if ch.isalnum() or ch in ("_", "-")).lower()
+        return safe or "csv-upload"
+
     def _resolve_engine(self, database_id: str, connection_payload: Optional[Dict[str, Any]] = None):
-        """Return SQLAlchemy engine, building a temporary one if a payload is provided."""
+        """Return SQLAlchemy engine, building a temporary one if a payload is provided.
+        Skips engine creation when handling uploaded datasets.
+        """
         if database_id in active_connections:
             return active_connections[database_id]["engine"]
 
@@ -118,28 +128,47 @@ class GDMService:
     async def start_job(
         self,
         *,
-        database_id: str,
+        database_id: Optional[str],
         user_model: Optional[str] = None,
         connection_payload: Optional[Dict[str, Any]] = None,
+        dataset: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         """Create a job, choose the model, and enqueue processing."""
-        engine = self._resolve_engine(database_id, connection_payload)
-        table_count = await asyncio.to_thread(self._count_tables, engine)
-        db_size_mb = await asyncio.to_thread(self._estimate_database_size, engine)
+        is_csv_source = dataset is not None
+        if not database_id and not is_csv_source:
+            raise ValueError("database_id is required when no dataset is provided.")
+
+        engine = None
+        table_count: Optional[int] = None
+        db_size_mb: Optional[float] = None
+        derived_db_id = database_id
+
+        if is_csv_source:
+            table_count = 1
+            db_size_mb = None
+            derived_db_id = database_id or self._slugify_dataset(dataset)
+        else:
+            engine = self._resolve_engine(database_id, connection_payload)
+            table_count = await asyncio.to_thread(self._count_tables, engine)
+            db_size_mb = await asyncio.to_thread(self._estimate_database_size, engine)
+            derived_db_id = database_id
+
         model_used = self.choose_model(user_model, table_count)
 
         job_id = str(uuid4())
         job = GDMJob(
             job_id=job_id,
-            database_id=database_id,
+            database_id=derived_db_id or "csv-upload",
             model_used=model_used,
             connection_payload=connection_payload,
             table_count=table_count,
             database_size_mb=db_size_mb,
-            owns_engine=database_id not in active_connections,
+            owns_engine=not is_csv_source and (derived_db_id not in active_connections),
+            source_type="csv" if is_csv_source else "database",
+            dataset=dataset,
         )
         job.engine = engine
-        job.output_dir = self.output_root / database_id / model_used / job_id
+        job.output_dir = self.output_root / job.database_id / model_used / job_id
         job.output_dir.mkdir(parents=True, exist_ok=True)
 
         # Size warnings
@@ -153,7 +182,12 @@ class GDMService:
             )
 
         self.jobs[job_id] = job
-        logger.info("Queued GDM job %s for database %s using %s", job_id, database_id, model_used)
+        logger.info(
+            "Queued GDM job %s for %s using %s",
+            job_id,
+            job.database_id,
+            model_used,
+        )
 
         asyncio.create_task(self._run_pipeline(job_id))
 
@@ -208,21 +242,25 @@ class GDMService:
 
     async def _run_pipeline(self, job_id: str):
         job = self.jobs[job_id]
-        engine = job.engine or self._resolve_engine(job.database_id, job.connection_payload)
+        engine = job.engine or (
+            None
+            if job.source_type == "csv"
+            else self._resolve_engine(job.database_id, job.connection_payload)
+        )
         try:
             job.status = "running"
             job.append_log("metadata_harvest", "Harvesting schema metadata")
             job.progress = 5
 
             metadata = await asyncio.to_thread(
-                self._harvest_metadata, engine
+                self._harvest_metadata, engine, job.dataset
             )
             job.table_count = metadata.get("table_count", job.table_count)
             job.append_log("profiling", "Profiling data samples")
             job.progress = 25
 
             profiling = await asyncio.to_thread(
-                self._profile_data, engine, metadata
+                self._profile_data, engine, metadata, job.dataset
             )
             job.append_log("embeddings", "Computing embeddings and glossary candidates")
             job.progress = 45
@@ -276,7 +314,10 @@ class GDMService:
                     logger.debug("Unable to dispose temporary engine for job %s: %s", job_id, exc)
                 job.engine = None
 
-    def _harvest_metadata(self, engine):
+    def _harvest_metadata(self, engine, dataset: Optional[Dict[str, Any]] = None):
+        if dataset is not None:
+            return self._harvest_dataset_metadata(dataset)
+
         with engine.connect() as conn:
             table_rows = conn.execute(
                 text(
@@ -386,14 +427,77 @@ class GDMService:
             "table_count": len(entities),
         }
 
+    def _harvest_dataset_metadata(self, dataset: Dict[str, Any]) -> Dict[str, Any]:
+        name = dataset.get("name") or "csv_dataset"
+        base_name = name.rsplit(".", 1)[0]
+        columns = dataset.get("columns") or []
+        rows = dataset.get("rows") or []
+        row_count = dataset.get("row_count") or len(rows)
+
+        # Derive columns if not provided
+        if not columns and rows:
+            columns = list(rows[0].keys())
+
+        def infer_type(values: List[Any]) -> str:
+            for value in values:
+                if value is None:
+                    continue
+                if isinstance(value, bool):
+                    return "bit"
+                if isinstance(value, int):
+                    return "int"
+                if isinstance(value, float):
+                    return "float"
+                if isinstance(value, (datetime, date)):
+                    return "datetime"
+                return "nvarchar"
+            return "nvarchar"
+
+        inferred_columns: List[Dict[str, Any]] = []
+        for col in columns:
+            col_values = [row.get(col) for row in rows if isinstance(row, dict)]
+            dtype = infer_type(col_values)
+            inferred_columns.append(
+                {
+                    "name": col,
+                    "type": dtype,
+                    "nullable": any(v is None for v in col_values),
+                    "max_length": None,
+                    "default": None,
+                    "is_primary_key": col.lower() == "id",
+                }
+            )
+
+        entities = [
+            {
+                "schema": "csv",
+                "name": base_name,
+                "columns": inferred_columns,
+                "row_count": row_count,
+            }
+        ]
+
+        return {"entities": entities, "table_count": 1}
+
     def _profile_data(
         self,
         engine,
         metadata: Dict[str, Any],
+        dataset: Optional[Dict[str, Any]] = None,
         sample_tables: int = 5,
         sample_rows: int = 5,
     ):
         profiles = {}
+        if dataset is not None:
+            rows = dataset.get("rows") or []
+            sample = rows[:sample_rows]
+            entity = metadata["entities"][0] if metadata.get("entities") else {"schema": "csv", "name": "dataset"}
+            profiles[f"{entity['schema']}.{entity['name']}"] = {
+                "row_count": dataset.get("row_count") or len(rows),
+                "sample_rows": sample,
+            }
+            return profiles
+
         with engine.connect() as conn:
             for entity in metadata["entities"][:sample_tables]:
                 schema = entity["schema"]
@@ -521,6 +625,8 @@ class GDMService:
             "database_id": job.database_id,
             "generated_at": job.completed_at or _timestamp(),
             "model_used": job.model_used,
+            "source_type": job.source_type,
+            "dataset_name": (job.dataset or {}).get("name") if job.source_type == "csv" else None,
             "entities": metadata["entities"],
             "relationships": relationships,
             "profiles": profiles,

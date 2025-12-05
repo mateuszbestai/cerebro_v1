@@ -24,11 +24,13 @@ import { Bolt, CheckCircleOutline, InfoOutlined, PlayArrow, SaveAltOutlined, Tim
 import { gdmApi, GDMArtifact, GDMStatusResponse } from '../../services/gdmApi';
 import { Link as RouterLink } from 'react-router-dom';
 import { loadLastGdmJob, saveLastGdmJob, LastGdmJobMetadata } from '../../utils/gdmStorage';
+import { CsvDataset } from '../../contexts/DatabaseContext';
 
 type ModelOption = 'gpt-5' | 'gpt-4.1';
 
 interface CreateGDMButtonProps {
-  dbId: string | null;
+  dbId?: string | null;
+  csvDataset?: CsvDataset | null;
 }
 
 const modelDescriptions: Record<ModelOption, { title: string; subtitle: string; icon: React.ReactNode }> = {
@@ -72,7 +74,7 @@ const pipelineSteps: Record<
   failed: { label: 'Failed', index: 5 },
 };
 
-const CreateGDMButton: React.FC<CreateGDMButtonProps> = ({ dbId }) => {
+const CreateGDMButton: React.FC<CreateGDMButtonProps> = ({ dbId, csvDataset }) => {
   const theme = useTheme();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [selectedModel, setSelectedModel] = useState<ModelOption>('gpt-5');
@@ -84,7 +86,8 @@ const CreateGDMButton: React.FC<CreateGDMButtonProps> = ({ dbId }) => {
   const [savedJob, setSavedJob] = useState<LastGdmJobMetadata | null>(() => loadLastGdmJob());
 
   const isRunning = status ? status.status === 'running' : false;
-  const buttonDisabled = !dbId || isSubmitting || isRunning;
+  const hasSource = Boolean(dbId) || Boolean(csvDataset);
+  const buttonDisabled = !hasSource || isSubmitting || isRunning;
 
   useEffect(() => {
     if (!jobId) return;
@@ -128,22 +131,29 @@ const CreateGDMButton: React.FC<CreateGDMButtonProps> = ({ dbId }) => {
     }
     const metadata: LastGdmJobMetadata = {
       jobId: status.job_id,
-      databaseId: dbId || savedJob?.databaseId || null,
+      databaseId: (dbId || csvDataset?.name || savedJob?.databaseId || null) ?? null,
       completedAt: status.completed_at,
       modelUsed: status.model_used,
     };
     saveLastGdmJob(metadata);
     setSavedJob(metadata);
-  }, [status?.status, status?.job_id, status?.completed_at, status?.model_used, dbId, savedJob?.databaseId]);
+  }, [status?.status, status?.job_id, status?.completed_at, status?.model_used, dbId, savedJob?.databaseId, csvDataset?.name]);
 
   const startJob = async () => {
-    if (!dbId) return;
     setSubmitting(true);
     setError(null);
     try {
       const response = await gdmApi.create({
-        database_id: dbId,
+        database_id: dbId || undefined,
         model: selectedModel,
+        dataset: csvDataset
+          ? {
+              name: csvDataset.name,
+              columns: csvDataset.columns,
+              rows: csvDataset.data,
+              row_count: csvDataset.rowCount,
+            }
+          : undefined,
       });
       setWarnings(response.warnings || []);
       setJobId(response.job_id);
@@ -247,7 +257,13 @@ const CreateGDMButton: React.FC<CreateGDMButtonProps> = ({ dbId }) => {
           </Stack>
         </Alert>
       )}
-      <Tooltip title={!dbId ? 'Connect to a database to enable GDM generation' : ''}>
+      <Tooltip
+        title={
+          !hasSource
+            ? 'Connect to a database or load a CSV dataset to enable GDM generation'
+            : ''
+        }
+      >
         <span>
           <Button
             variant="contained"
@@ -258,7 +274,11 @@ const CreateGDMButton: React.FC<CreateGDMButtonProps> = ({ dbId }) => {
             startIcon={<PlayArrow />}
             sx={{ mb: 2 }}
           >
-            {isRunning ? `Building global model with ${currentModelLabel}…` : 'Would you like to create a Global Data Model for this database?'}
+            {isRunning
+              ? `Building global model with ${currentModelLabel}…`
+              : csvDataset
+              ? 'Create a Global Data Model for this CSV'
+              : 'Would you like to create a Global Data Model for this database?'}
           </Button>
         </span>
       </Tooltip>
@@ -389,7 +409,9 @@ const CreateGDMButton: React.FC<CreateGDMButtonProps> = ({ dbId }) => {
         <DialogTitle>Prepare a Global Data Model</DialogTitle>
         <DialogContent dividers>
           <Typography variant="body1" gutterBottom>
-            Creating a Global Data Model requires deep schema understanding and reasoning. GPT-5 is recommended for best results. Would you like to proceed with GPT-5 or use GPT-4.1 for faster execution?
+            Creating a Global Data Model{csvDataset ? ' from your uploaded CSV' : ''} requires deep
+            schema understanding and reasoning. GPT-5 is recommended for best results. Would you like
+            to proceed with GPT-5 or use GPT-4.1 for faster execution?
           </Typography>
 
           <Stack spacing={2} sx={{ mt: 2 }}>
