@@ -33,10 +33,3 @@ export const saveLastGdmJob = (payload: LastGdmJobMetadata) => {
     console.warn('Unable to persist latest GDM job metadata:', error);
   }
 };
-
-export const clearLastGdmJob = () => {
-  if (!isBrowser) {
-    return;
-  }
-  window.localStorage.removeItem(STORAGE_KEY);
-};

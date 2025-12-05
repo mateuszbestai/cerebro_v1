@@ -1,15 +1,13 @@
 import logging
-import logging.config
 import json
 from datetime import datetime
-from typing import Dict, Any
 import sys
 
 from app.config import settings
 
 class JSONFormatter(logging.Formatter):
     """JSON formatter for structured logging"""
-    
+
     def format(self, record: logging.LogRecord) -> str:
         log_data = {
             "timestamp": datetime.utcnow().isoformat(),
@@ -20,25 +18,25 @@ class JSONFormatter(logging.Formatter):
             "function": record.funcName,
             "line": record.lineno
         }
-        
+
         if hasattr(record, 'extra_data'):
             log_data.update(record.extra_data)
-        
+
         if record.exc_info:
             log_data["exception"] = self.formatException(record.exc_info)
-        
+
         return json.dumps(log_data)
 
 def setup_logger(name: str = None) -> logging.Logger:
     """Setup logger with appropriate configuration"""
-    
+
     logger = logging.getLogger(name or __name__)
-    
+
     if not logger.handlers:
         # Console handler
         console_handler = logging.StreamHandler(sys.stdout)
         console_handler.setLevel(getattr(logging, settings.LOG_LEVEL))
-        
+
         # Format based on environment
         if settings.LOG_LEVEL == "DEBUG":
             formatter = logging.Formatter(
@@ -46,17 +44,12 @@ def setup_logger(name: str = None) -> logging.Logger:
             )
         else:
             formatter = JSONFormatter()
-        
+
         console_handler.setFormatter(formatter)
         logger.addHandler(console_handler)
         logger.setLevel(getattr(logging, settings.LOG_LEVEL))
-        
+
         # Prevent propagation to avoid duplicate logs
         logger.propagate = False
-    
-    return logger
 
-def log_with_context(logger: logging.Logger, level: str, message: str, **context):
-    """Log with additional context"""
-    extra_data = {"extra_data": context}
-    getattr(logger, level.lower())(message, extra=extra_data)
+    return logger
